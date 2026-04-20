@@ -1,0 +1,55 @@
+{
+  "name": "Intervals",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
+  "runArgs": [
+    "--name",
+    "intervals-devcontainer",
+    "--hostname",
+    "intervals-devcontainer"
+  ],
+  "remoteUser": "node",
+  "containerEnv": {
+    "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0"
+  },
+  "forwardPorts": [
+    5173,
+    4173,
+    63315
+  ],
+  "portsAttributes": {
+    "5173": {
+      "label": "Vite dev server",
+      "onAutoForward": "notify"
+    },
+    "4173": {
+      "label": "Vite preview",
+      "onAutoForward": "silent"
+    },
+    "63315": {
+      "label": "Vitest browser mode",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "if [ -f pnpm-lock.yaml ]; then corepack pnpm install; elif [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm install; fi",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "vitest.explorer",
+        "ms-playwright.playwright"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ],
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  }
+}
