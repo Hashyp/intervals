@@ -45,10 +45,10 @@ describe("interval question generation", () => {
         () => 0.99,
       );
 
-      expect(question.rootMidi).toBeGreaterThanOrEqual(48);
-      expect(question.rootMidi).toBeLessThanOrEqual(84);
-      expect(question.targetMidi).toBeGreaterThanOrEqual(48);
-      expect(question.targetMidi).toBeLessThanOrEqual(84);
+      expect(question.rootMidi).toBeGreaterThanOrEqual(60);
+      expect(question.rootMidi).toBeLessThanOrEqual(72);
+      expect(question.targetMidi).toBeGreaterThanOrEqual(60);
+      expect(question.targetMidi).toBeLessThanOrEqual(72);
     }
   });
 });
@@ -63,4 +63,3 @@ describe("midi helpers", () => {
     expect(midiToNoteName(70)).toBe("Bb4");
   });
 });
-

@@ -1,67 +1,79 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Tone from "tone";
 import type { IntervalQuestion } from "../music/intervals";
-import { midiToFrequency } from "../music/intervals";
+import { midiToNoteName } from "../music/intervals";
 
-type AudioState = "idle" | "playing" | "error";
+type AudioState = "idle" | "loading" | "playing" | "error";
+
+const GUITAR_SAMPLE_URLS = {
+  C4: "c4.mp3",
+  Db4: "db4.mp3",
+  D4: "d4.mp3",
+  Eb4: "eb4.mp3",
+  E4: "e4.mp3",
+  F4: "f4.mp3",
+  Gb4: "gb4.mp3",
+  G4: "g4.mp3",
+  Ab4: "ab4.mp3",
+  A4: "a4.mp3",
+  Bb4: "bb4.mp3",
+  B4: "b4.mp3",
+  C5: "c5.mp3",
+} as const;
 
 export function useIntervalAudio() {
-  const synthRef = useRef<Tone.PolySynth | null>(null);
+  const samplerRef = useRef<Tone.Sampler | null>(null);
   const [audioState, setAudioState] = useState<AudioState>("idle");
 
-  const getSynth = useCallback(() => {
-    if (!synthRef.current) {
-      synthRef.current = new Tone.PolySynth(Tone.Synth, {
-        oscillator: {
-          type: "triangle",
-        },
-        envelope: {
-          attack: 0.025,
-          decay: 0.15,
-          sustain: 0.65,
-          release: 0.28,
-        },
-        volume: -9,
+  const getSampler = useCallback(() => {
+    if (!samplerRef.current) {
+      samplerRef.current = new Tone.Sampler({
+        urls: GUITAR_SAMPLE_URLS,
+        baseUrl: `${import.meta.env.BASE_URL}samples/guitar/`,
+        release: 1.1,
+        volume: -5,
       }).toDestination();
     }
 
-    return synthRef.current;
+    return samplerRef.current;
   }, []);
 
   const play = useCallback(
     async (question: IntervalQuestion) => {
       try {
-        setAudioState("playing");
+        setAudioState("loading");
         await Tone.start();
+        const sampler = getSampler();
+        await Tone.loaded();
 
-        const synth = getSynth();
+        setAudioState("playing");
         const now = Tone.now() + 0.08;
-        const rootFrequency = midiToFrequency(question.rootMidi);
-        const targetFrequency = midiToFrequency(question.targetMidi);
+        const rootNote = midiToNoteName(question.rootMidi);
+        const targetNote = midiToNoteName(question.targetMidi);
 
-        synth.releaseAll();
+        sampler.releaseAll();
 
         if (question.mode === "harmonic") {
-          synth.triggerAttackRelease([rootFrequency, targetFrequency], 1.25, now);
+          sampler.triggerAttackRelease([rootNote, targetNote], 1.8, now, 0.95);
         } else {
-          synth.triggerAttackRelease(rootFrequency, 0.65, now);
-          synth.triggerAttackRelease(targetFrequency, 0.75, now + 0.9);
+          sampler.triggerAttackRelease(rootNote, 1.35, now, 0.95);
+          sampler.triggerAttackRelease(targetNote, 1.35, now + 1.05, 0.95);
         }
 
         window.setTimeout(() => {
           setAudioState("idle");
-        }, question.mode === "harmonic" ? 1350 : 1750);
+        }, question.mode === "harmonic" ? 2100 : 2550);
       } catch {
         setAudioState("error");
       }
     },
-    [getSynth],
+    [getSampler],
   );
 
   useEffect(() => {
     return () => {
-      synthRef.current?.dispose();
-      synthRef.current = null;
+      samplerRef.current?.dispose();
+      samplerRef.current = null;
     };
   }, []);
 
@@ -70,4 +82,3 @@ export function useIntervalAudio() {
     play,
   };
 }
-

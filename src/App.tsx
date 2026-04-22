@@ -164,9 +164,13 @@ export function App() {
             className="primary-button"
             type="button"
             onClick={() => void play(question)}
-            disabled={audioState === "playing"}
+            disabled={audioState === "playing" || audioState === "loading"}
           >
-            {audioState === "playing" ? "Playing" : "Play notes"}
+            {audioState === "loading"
+              ? "Loading guitar"
+              : audioState === "playing"
+                ? "Playing"
+                : "Play guitar notes"}
           </button>
           <button className="secondary-button" type="button" onClick={nextQuestion}>
             Next interval
@@ -287,7 +291,7 @@ function getFeedbackText(
   question: ReturnType<typeof createQuestion>,
 ) {
   if (!guess) {
-    return "Play the notes, then choose the interval you hear.";
+    return "Play the guitar notes, then choose the interval you hear.";
   }
 
   if (guess.correct) {
@@ -324,4 +328,3 @@ function formatMode(mode: string) {
 
   return mode[0].toUpperCase() + mode.slice(1);
 }
-

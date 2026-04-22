@@ -142,9 +142,9 @@ export const DEFAULT_INTERVAL_IDS: readonly IntervalId[] = [
 ];
 
 const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
-const PLAYABLE_MIN_MIDI = 48;
-const PLAYABLE_MAX_MIDI = 84;
-const ROOT_MIN_MIDI = 52;
+const PLAYABLE_MIN_MIDI = 60;
+const PLAYABLE_MAX_MIDI = 72;
+const ROOT_MIN_MIDI = 60;
 const ROOT_MAX_MIDI = 72;
 const REAL_MODES: readonly PlayMode[] = ["ascending", "descending", "harmonic"];
 
@@ -204,4 +204,3 @@ function pickOne<T>(items: readonly T[], random: () => number): T {
 
   return items[index];
 }
-

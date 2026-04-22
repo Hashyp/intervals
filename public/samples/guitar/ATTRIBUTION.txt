@@ -1,0 +1,18 @@
+Guitar samples used by this app:
+
+Source repository:
+https://github.com/sfzinstruments/karoryfer.black-and-green-guitars
+
+Selected articulation:
+Samples/green/ord
+
+Bundled note files:
+C4, Db4, D4, Eb4, E4, F4, Gb4, G4, Ab4, A4, Bb4, B4, C5
+
+License:
+CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Repository description at time of integration:
+"Open source electric guitar sample library"
+
