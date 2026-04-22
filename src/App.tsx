@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useIntervalAudio } from "./audio/useIntervalAudio";
+import { useIntervalAudio, type InstrumentId } from "./audio/useIntervalAudio";
 import {
   DEFAULT_INTERVAL_IDS,
   INTERVALS,
@@ -40,6 +40,17 @@ const MODES: readonly { id: TrainingMode; label: string }[] = [
   },
 ];
 
+const INSTRUMENTS: readonly { id: InstrumentId; label: string }[] = [
+  {
+    id: "guitar",
+    label: "Guitar",
+  },
+  {
+    id: "piano",
+    label: "Piano",
+  },
+];
+
 const initialScore: Score = {
   attempts: 0,
   correct: 0,
@@ -52,6 +63,7 @@ export function App() {
     getInitialIntervalIds(),
   );
   const [mode, setMode] = useState<TrainingMode>(() => getInitialMode());
+  const [instrument, setInstrument] = useState<InstrumentId>(() => getInitialInstrument());
   const [question, setQuestion] = useState(() =>
     createQuestion({
       enabledIntervalIds: getInitialIntervalIds(),
@@ -89,10 +101,11 @@ export function App() {
 
     params.set("mode", mode);
     params.set("intervals", serializeIntervalIds(enabledIntervalIds));
+    params.set("instrument", instrument);
 
     const nextUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, "", nextUrl);
-  }, [enabledIntervalIds, mode]);
+  }, [enabledIntervalIds, instrument, mode]);
 
   const handleGuess = useCallback(
     (selectedId: IntervalId) => {
@@ -138,7 +151,7 @@ export function App() {
     setScore(initialScore);
   }, []);
 
-  const feedbackText = getFeedbackText(guess, question);
+  const feedbackText = getFeedbackText(guess, question, instrument);
   const rootNote = midiToNoteName(question.rootMidi);
   const targetNote = midiToNoteName(question.targetMidi);
 
@@ -160,7 +173,7 @@ export function App() {
         <img
           className="studio-image"
           src="https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=1200&q=80"
-          alt="Electric guitar on stage under warm light"
+          alt="Live instrument setup under warm stage light"
           width="1200"
           height="900"
           fetchPriority="high"
@@ -180,14 +193,14 @@ export function App() {
           <button
             className="primary-button"
             type="button"
-            onClick={() => void play(question)}
+            onClick={() => void play(question, instrument)}
             disabled={audioState === "playing" || audioState === "loading"}
           >
             {audioState === "loading"
               ? "Loading…"
               : audioState === "playing"
                 ? "Playing"
-                : "Play Guitar Notes"}
+                : `Play ${formatInstrument(instrument)} Notes`}
           </button>
           <button className="secondary-button" type="button" onClick={nextQuestion}>
             Next Interval
@@ -240,6 +253,26 @@ export function App() {
                 onClick={() => setMode(modeOption.id)}
               >
                 {modeOption.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings-panel">
+          <div className="section-heading">
+            <p className="eyebrow">Instrument</p>
+            <h2>Choose Sample Bank</h2>
+          </div>
+          <div className="segmented-control">
+            {INSTRUMENTS.map((option) => (
+              <button
+                aria-pressed={instrument === option.id}
+                className={instrument === option.id ? "is-active" : ""}
+                key={option.id}
+                type="button"
+                onClick={() => setInstrument(option.id)}
+              >
+                {option.label}
               </button>
             ))}
           </div>
@@ -311,9 +344,10 @@ export function App() {
 function getFeedbackText(
   guess: GuessState | null,
   question: ReturnType<typeof createQuestion>,
+  instrument: InstrumentId,
 ) {
   if (!guess) {
-    return "Play the guitar notes, then choose the interval you hear.";
+    return `Play the ${instrument} notes, then choose the interval you hear.`;
   }
 
   if (guess.correct) {
@@ -351,6 +385,10 @@ function formatMode(mode: string) {
   return mode[0].toUpperCase() + mode.slice(1);
 }
 
+function formatInstrument(instrument: InstrumentId) {
+  return instrument[0].toUpperCase() + instrument.slice(1);
+}
+
 function getInitialMode(): TrainingMode {
   const params = new URLSearchParams(window.location.search);
   const mode = params.get("mode");
@@ -360,6 +398,17 @@ function getInitialMode(): TrainingMode {
   }
 
   return "ascending";
+}
+
+function getInitialInstrument(): InstrumentId {
+  const params = new URLSearchParams(window.location.search);
+  const instrument = params.get("instrument");
+
+  if (instrument === "guitar" || instrument === "piano") {
+    return instrument;
+  }
+
+  return "guitar";
 }
 
 function getInitialIntervalIds(): IntervalId[] {

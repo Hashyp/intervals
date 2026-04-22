@@ -4,6 +4,7 @@ import type { IntervalQuestion } from "../music/intervals";
 import { midiToNoteName } from "../music/intervals";
 
 type AudioState = "idle" | "loading" | "playing" | "error";
+export type InstrumentId = "guitar" | "piano";
 
 const GUITAR_SAMPLE_URLS = {
   C4: "c4.mp3",
@@ -21,35 +22,91 @@ const GUITAR_SAMPLE_URLS = {
   C5: "c5.mp3",
 } as const;
 
+const PIANO_SAMPLE_URLS = {
+  A0: "A0.mp3",
+  C1: "C1.mp3",
+  "D#1": "Ds1.mp3",
+  "F#1": "Fs1.mp3",
+  A1: "A1.mp3",
+  C2: "C2.mp3",
+  "D#2": "Ds2.mp3",
+  "F#2": "Fs2.mp3",
+  A2: "A2.mp3",
+  C3: "C3.mp3",
+  "D#3": "Ds3.mp3",
+  "F#3": "Fs3.mp3",
+  A3: "A3.mp3",
+  C4: "C4.mp3",
+  "D#4": "Ds4.mp3",
+  "F#4": "Fs4.mp3",
+  A4: "A4.mp3",
+  C5: "C5.mp3",
+  "D#5": "Ds5.mp3",
+  "F#5": "Fs5.mp3",
+  A5: "A5.mp3",
+  C6: "C6.mp3",
+  "D#6": "Ds6.mp3",
+  "F#6": "Fs6.mp3",
+  A6: "A6.mp3",
+  C7: "C7.mp3",
+  "D#7": "Ds7.mp3",
+  "F#7": "Fs7.mp3",
+  A7: "A7.mp3",
+  C8: "C8.mp3",
+} as const;
+
+type SamplerConfig = {
+  baseUrl: string;
+  release: number;
+  volume: number;
+  urls: Record<string, string>;
+};
+
+const INSTRUMENT_SAMPLER_CONFIG: Record<InstrumentId, SamplerConfig> = {
+  guitar: {
+    urls: GUITAR_SAMPLE_URLS,
+    baseUrl: `${import.meta.env.BASE_URL}samples/guitar/`,
+    release: 1.1,
+    volume: -5,
+  },
+  piano: {
+    urls: PIANO_SAMPLE_URLS,
+    baseUrl: `${import.meta.env.BASE_URL}samples/piano/`,
+    release: 1.15,
+    volume: -8,
+  },
+};
+
 export function useIntervalAudio() {
-  const samplerRef = useRef<Tone.Sampler | null>(null);
+  const samplersRef = useRef<Partial<Record<InstrumentId, Tone.Sampler>>>({});
   const [audioState, setAudioState] = useState<AudioState>("idle");
 
-  const getSampler = useCallback(() => {
-    if (!samplerRef.current) {
-      samplerRef.current = new Tone.Sampler({
-        urls: GUITAR_SAMPLE_URLS,
-        baseUrl: `${import.meta.env.BASE_URL}samples/guitar/`,
-        release: 1.1,
-        volume: -5,
-      }).toDestination();
+  const getSampler = useCallback((instrument: InstrumentId) => {
+    if (!samplersRef.current[instrument]) {
+      samplersRef.current[instrument] = new Tone.Sampler(
+        INSTRUMENT_SAMPLER_CONFIG[instrument],
+      ).toDestination();
     }
 
-    return samplerRef.current;
+    return samplersRef.current[instrument];
   }, []);
 
   const play = useCallback(
-    async (question: IntervalQuestion) => {
+    async (question: IntervalQuestion, instrument: InstrumentId) => {
       try {
         setAudioState("loading");
         await Tone.start();
-        const sampler = getSampler();
+        const sampler = getSampler(instrument);
         await Tone.loaded();
 
         setAudioState("playing");
         const now = Tone.now() + 0.08;
         const rootNote = midiToNoteName(question.rootMidi);
         const targetNote = midiToNoteName(question.targetMidi);
+
+        for (const activeSampler of Object.values(samplersRef.current)) {
+          activeSampler?.releaseAll();
+        }
 
         sampler.releaseAll();
 
@@ -72,8 +129,10 @@ export function useIntervalAudio() {
 
   useEffect(() => {
     return () => {
-      samplerRef.current?.dispose();
-      samplerRef.current = null;
+      for (const sampler of Object.values(samplersRef.current)) {
+        sampler?.dispose();
+      }
+      samplersRef.current = {};
     };
   }, []);
 
