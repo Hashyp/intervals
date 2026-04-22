@@ -48,14 +48,14 @@ const initialScore: Score = {
 };
 
 export function App() {
-  const [enabledIntervalIds, setEnabledIntervalIds] = useState<IntervalId[]>([
-    ...DEFAULT_INTERVAL_IDS,
-  ]);
-  const [mode, setMode] = useState<TrainingMode>("ascending");
+  const [enabledIntervalIds, setEnabledIntervalIds] = useState<IntervalId[]>(() =>
+    getInitialIntervalIds(),
+  );
+  const [mode, setMode] = useState<TrainingMode>(() => getInitialMode());
   const [question, setQuestion] = useState(() =>
     createQuestion({
-      enabledIntervalIds: DEFAULT_INTERVAL_IDS,
-      mode: "ascending",
+      enabledIntervalIds: getInitialIntervalIds(),
+      mode: getInitialMode(),
     }),
   );
   const [guess, setGuess] = useState<GuessState | null>(null);
@@ -83,6 +83,16 @@ export function App() {
   useEffect(() => {
     nextQuestion();
   }, [nextQuestion]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    params.set("mode", mode);
+    params.set("intervals", serializeIntervalIds(enabledIntervalIds));
+
+    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [enabledIntervalIds, mode]);
 
   const handleGuess = useCallback(
     (selectedId: IntervalId) => {
@@ -133,11 +143,15 @@ export function App() {
   const targetNote = midiToNoteName(question.targetMidi);
 
   return (
-    <main className="app-shell">
+    <>
+      <a className="skip-link" href="#main-content">
+        Skip to Trainer
+      </a>
+      <main className="app-shell" id="main-content">
       <section className="intro-band" aria-labelledby="page-title">
         <div className="intro-copy">
           <p className="eyebrow">Ear training</p>
-          <h1 id="page-title">Hear two notes. Name the interval.</h1>
+          <h1 id="page-title">Hear Two Notes. Name the Interval.</h1>
           <p className="lede">
             Build a steadier ear with short rounds, clear feedback, and focused
             interval sets.
@@ -145,8 +159,11 @@ export function App() {
         </div>
         <img
           className="studio-image"
-          src="https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=1200&q=80"
-          alt="Piano keys and studio equipment"
+          src="https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=1200&q=80"
+          alt="Electric guitar on stage under warm light"
+          width="1200"
+          height="900"
+          fetchPriority="high"
         />
       </section>
 
@@ -154,7 +171,7 @@ export function App() {
         <div className="trainer-header">
           <div>
             <p className="eyebrow">Current round</p>
-            <h2>{guess ? `${rootNote} to ${targetNote}` : "Listen first"}</h2>
+            <h2>{guess ? `${rootNote} to ${targetNote}` : "Listen First"}</h2>
           </div>
           <div className="mode-chip">{formatMode(question.mode)}</div>
         </div>
@@ -167,17 +184,21 @@ export function App() {
             disabled={audioState === "playing" || audioState === "loading"}
           >
             {audioState === "loading"
-              ? "Loading guitar"
+              ? "Loading…"
               : audioState === "playing"
                 ? "Playing"
-                : "Play guitar notes"}
+                : "Play Guitar Notes"}
           </button>
           <button className="secondary-button" type="button" onClick={nextQuestion}>
-            Next interval
+            Next Interval
           </button>
         </div>
 
-        <p className={`feedback ${guess?.correct ? "is-correct" : ""}`}>
+        <p
+          aria-live="polite"
+          className={`feedback ${guess?.correct ? "is-correct" : ""}`}
+          role="status"
+        >
           {audioState === "error"
             ? "Audio could not start. Click play again or check browser audio permissions."
             : feedbackText}
@@ -207,7 +228,7 @@ export function App() {
         <div className="settings-panel">
           <div className="section-heading">
             <p className="eyebrow">Practice mode</p>
-            <h2>Choose how notes are played</h2>
+            <h2>Choose How Notes Are Played</h2>
           </div>
           <div className="segmented-control">
             {MODES.map((modeOption) => (
@@ -227,7 +248,7 @@ export function App() {
         <div className="settings-panel">
           <div className="section-heading">
             <p className="eyebrow">Interval set</p>
-            <h2>Focus the round</h2>
+            <h2>Focus the Round</h2>
           </div>
           <div className="interval-toggle-grid">
             {INTERVALS.map((interval) => {
@@ -278,11 +299,12 @@ export function App() {
             </div>
           </dl>
           <button className="secondary-button full-width" type="button" onClick={resetScore}>
-            Reset score
+            Reset Score
           </button>
         </div>
       </section>
-    </main>
+      </main>
+    </>
   );
 }
 
@@ -327,4 +349,44 @@ function formatMode(mode: string) {
   }
 
   return mode[0].toUpperCase() + mode.slice(1);
+}
+
+function getInitialMode(): TrainingMode {
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get("mode");
+
+  if (mode === "ascending" || mode === "descending" || mode === "harmonic" || mode === "mixed") {
+    return mode;
+  }
+
+  return "ascending";
+}
+
+function getInitialIntervalIds(): IntervalId[] {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("intervals");
+
+  if (!raw) {
+    return [...DEFAULT_INTERVAL_IDS];
+  }
+
+  const validIds = INTERVALS.map((interval) => interval.id);
+  const requestedIds = raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value): value is IntervalId => validIds.includes(value as IntervalId));
+
+  if (requestedIds.length === 0) {
+    return [...DEFAULT_INTERVAL_IDS];
+  }
+
+  return INTERVALS.filter((interval) => requestedIds.includes(interval.id)).map(
+    (interval) => interval.id,
+  );
+}
+
+function serializeIntervalIds(intervalIds: readonly IntervalId[]) {
+  return INTERVALS.filter((interval) => intervalIds.includes(interval.id))
+    .map((interval) => interval.id)
+    .join(",");
 }

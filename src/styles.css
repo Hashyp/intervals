@@ -25,16 +25,43 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  -webkit-tap-highlight-color: rgb(0 124 101 / 12%);
   background:
     linear-gradient(180deg, #f5f7f6 0%, #eef4f1 48%, #f8faf9 100%);
 }
 
 button {
   font: inherit;
+  touch-action: manipulation;
+}
+
+.skip-link {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  box-shadow: 0 0 0 3px rgb(12 122 146 / 22%);
 }
 
 .app-shell {
@@ -79,6 +106,7 @@ h2 {
   margin: 0;
   color: var(--ink);
   line-height: 1.08;
+  text-wrap: balance;
 }
 
 h1 {
@@ -158,6 +186,7 @@ h2 {
   transition:
     border-color 160ms ease,
     background-color 160ms ease,
+    box-shadow 160ms ease,
     color 160ms ease,
     transform 160ms ease;
 }
@@ -184,7 +213,31 @@ h2 {
 .answer-button:hover,
 .segmented-control button:hover,
 .interval-toggle-grid button:hover {
+  border-color: #8cb8ad;
+  box-shadow: 0 10px 24px rgb(29 35 33 / 10%);
   transform: translateY(-1px);
+}
+
+.primary-button:hover {
+  border-color: #006a57;
+  background: #006a57;
+}
+
+.secondary-button:hover,
+.answer-button:hover,
+.segmented-control button:hover,
+.interval-toggle-grid button:hover {
+  background: #f4f7f6;
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.answer-button:focus-visible,
+.segmented-control button:focus-visible,
+.interval-toggle-grid button:focus-visible {
+  outline: 3px solid rgb(12 122 146 / 24%);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(12 122 146 / 14%);
 }
 
 button:disabled {
@@ -357,6 +410,7 @@ button:disabled {
   color: var(--ink);
   font-size: 2rem;
   font-weight: 900;
+  font-variant-numeric: tabular-nums;
 }
 
 .full-width {
@@ -429,4 +483,3 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
-
