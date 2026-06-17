@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as Tone from "tone";
+import type * as Tone from "tone";
 import type { IntervalQuestion } from "../music/intervals";
 import { midiToNoteName } from "../music/intervals";
 
 type AudioState = "idle" | "loading" | "playing" | "error";
 export type InstrumentId = "guitar" | "piano";
+type ToneModule = typeof import("tone");
 
 const GUITAR_SAMPLE_URLS = {
   C4: "c4.mp3",
@@ -78,37 +79,108 @@ const INSTRUMENT_SAMPLER_CONFIG: Record<InstrumentId, SamplerConfig> = {
 };
 
 export function useIntervalAudio() {
+  const toneRef = useRef<ToneModule | null>(null);
   const samplersRef = useRef<Partial<Record<InstrumentId, Tone.Sampler>>>({});
+  const playbackTimeoutRef = useRef<number | null>(null);
+  const playbackTokenRef = useRef(0);
   const [audioState, setAudioState] = useState<AudioState>("idle");
 
-  const getSampler = useCallback((instrument: InstrumentId) => {
-    if (!samplersRef.current[instrument]) {
-      samplersRef.current[instrument] = new Tone.Sampler(
-        INSTRUMENT_SAMPLER_CONFIG[instrument],
-      ).toDestination();
+  const loadTone = useCallback(async () => {
+    if (!toneRef.current) {
+      toneRef.current = await import("tone");
     }
 
-    return samplersRef.current[instrument];
+    return toneRef.current;
   }, []);
+
+  const clearPlaybackTimeout = useCallback(() => {
+    if (playbackTimeoutRef.current !== null) {
+      window.clearTimeout(playbackTimeoutRef.current);
+      playbackTimeoutRef.current = null;
+    }
+  }, []);
+
+  const releaseAllSamplers = useCallback(() => {
+    for (const sampler of Object.values(samplersRef.current)) {
+      sampler?.releaseAll();
+    }
+  }, []);
+
+  const beginPlayback = useCallback(() => {
+    playbackTokenRef.current += 1;
+    clearPlaybackTimeout();
+    releaseAllSamplers();
+
+    return playbackTokenRef.current;
+  }, [clearPlaybackTimeout, releaseAllSamplers]);
+
+  const isCurrentPlayback = useCallback((token: number) => {
+    return playbackTokenRef.current === token;
+  }, []);
+
+  const finishPlaybackAfter = useCallback(
+    (durationMs: number, token: number) => {
+      clearPlaybackTimeout();
+      playbackTimeoutRef.current = window.setTimeout(() => {
+        if (!isCurrentPlayback(token)) {
+          return;
+        }
+
+        setAudioState("idle");
+        playbackTimeoutRef.current = null;
+      }, durationMs);
+    },
+    [clearPlaybackTimeout, isCurrentPlayback],
+  );
+
+  const stop = useCallback(() => {
+    playbackTokenRef.current += 1;
+    clearPlaybackTimeout();
+    releaseAllSamplers();
+    setAudioState("idle");
+  }, [clearPlaybackTimeout, releaseAllSamplers]);
+
+  const getSampler = useCallback(
+    (tone: ToneModule, instrument: InstrumentId) => {
+      if (!samplersRef.current[instrument]) {
+        samplersRef.current[instrument] = new tone.Sampler(
+          INSTRUMENT_SAMPLER_CONFIG[instrument],
+        ).toDestination();
+      }
+
+      return samplersRef.current[instrument];
+    },
+    [],
+  );
 
   const play = useCallback(
     async (question: IntervalQuestion, instrument: InstrumentId) => {
+      const token = beginPlayback();
+
       try {
         setAudioState("loading");
-        await Tone.start();
-        const sampler = getSampler(instrument);
-        await Tone.loaded();
+        const tone = await loadTone();
+        if (!isCurrentPlayback(token)) {
+          return;
+        }
+
+        await tone.start();
+        if (!isCurrentPlayback(token)) {
+          return;
+        }
+
+        const sampler = getSampler(tone, instrument);
+        await tone.loaded();
+        if (!isCurrentPlayback(token)) {
+          return;
+        }
 
         setAudioState("playing");
-        const now = Tone.now() + 0.08;
+        const now = tone.now() + 0.08;
         const rootNote = midiToNoteName(question.rootMidi);
         const targetNote = midiToNoteName(question.targetMidi);
 
-        for (const activeSampler of Object.values(samplersRef.current)) {
-          activeSampler?.releaseAll();
-        }
-
-        sampler.releaseAll();
+        releaseAllSamplers();
 
         if (question.mode === "harmonic") {
           sampler.triggerAttackRelease([rootNote, targetNote], 1.8, now, 0.95);
@@ -117,27 +189,119 @@ export function useIntervalAudio() {
           sampler.triggerAttackRelease(targetNote, 1.35, now + 1.05, 0.95);
         }
 
-        window.setTimeout(() => {
-          setAudioState("idle");
-        }, question.mode === "harmonic" ? 2100 : 2550);
+        finishPlaybackAfter(question.mode === "harmonic" ? 2100 : 2550, token);
       } catch {
-        setAudioState("error");
+        if (isCurrentPlayback(token)) {
+          setAudioState("error");
+        }
       }
     },
-    [getSampler],
+    [
+      beginPlayback,
+      finishPlaybackAfter,
+      getSampler,
+      isCurrentPlayback,
+      loadTone,
+      releaseAllSamplers,
+    ],
+  );
+
+  const playBetweenNotes = useCallback(
+    async (question: IntervalQuestion, instrument: InstrumentId) => {
+      const token = beginPlayback();
+
+      try {
+        setAudioState("loading");
+        const tone = await loadTone();
+        if (!isCurrentPlayback(token)) {
+          return;
+        }
+
+        await tone.start();
+        if (!isCurrentPlayback(token)) {
+          return;
+        }
+
+        const sampler = getSampler(tone, instrument);
+        await tone.loaded();
+        if (!isCurrentPlayback(token)) {
+          return;
+        }
+
+        setAudioState("playing");
+        const now = tone.now() + 0.08;
+        const midiNotes = getMidiNotesBetween(
+          question.rootMidi,
+          question.targetMidi,
+        );
+
+        releaseAllSamplers();
+
+        const stepDuration = 0.66;
+        const stepSpacing = 0.38;
+
+        midiNotes.forEach((midi, index) => {
+          sampler.triggerAttackRelease(
+            midiToNoteName(midi),
+            stepDuration,
+            now + index * stepSpacing,
+            0.94,
+          );
+        });
+
+        const totalDurationMs = Math.round(
+          (midiNotes.length * stepSpacing + 0.8) * 1000,
+        );
+        finishPlaybackAfter(totalDurationMs, token);
+      } catch {
+        if (isCurrentPlayback(token)) {
+          setAudioState("error");
+        }
+      }
+    },
+    [
+      beginPlayback,
+      finishPlaybackAfter,
+      getSampler,
+      isCurrentPlayback,
+      loadTone,
+      releaseAllSamplers,
+    ],
   );
 
   useEffect(() => {
     return () => {
+      playbackTokenRef.current += 1;
+      clearPlaybackTimeout();
       for (const sampler of Object.values(samplersRef.current)) {
         sampler?.dispose();
       }
       samplersRef.current = {};
     };
-  }, []);
+  }, [clearPlaybackTimeout]);
 
   return {
     audioState,
     play,
+    playBetweenNotes,
+    stop,
   };
+}
+
+function getMidiNotesBetween(fromMidi: number, toMidi: number) {
+  if (fromMidi === toMidi) {
+    return [fromMidi];
+  }
+
+  const step = toMidi > fromMidi ? 1 : -1;
+  const notes: number[] = [];
+
+  for (let midi = fromMidi; ; midi += step) {
+    notes.push(midi);
+    if (midi === toMidi) {
+      break;
+    }
+  }
+
+  return notes;
 }
