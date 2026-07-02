@@ -900,6 +900,47 @@ h2 {
   flex-wrap: wrap;
   min-height: 26px;
 }
+
+.api-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: rgba(0 0 0 / 0.18);
+}
+.api-status__label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.api-status__value {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: right;
+}
+.api-status--connected {
+  border-color: rgba(143 191 154 / 0.5);
+  background: var(--correct-soft);
+}
+.api-status--connected .api-status__value {
+  color: var(--correct);
+}
+.api-status--unavailable {
+  border-color: rgba(212 113 100 / 0.5);
+  background: var(--wrong-soft);
+}
+.api-status--unavailable .api-status__value {
+  color: var(--wrong);
+}
 .recent__empty {
   font-family: var(--font-mono);
   font-size: 0.72rem;

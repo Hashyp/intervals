@@ -30,6 +30,17 @@ type Score = {
   recent: boolean[];
 };
 
+type ApiStatus = {
+  service: string;
+  message: string;
+  timestampUtc: string;
+};
+
+type ApiConnection =
+  | { state: "loading" }
+  | { state: "connected"; status: ApiStatus }
+  | { state: "unavailable" };
+
 type TrainingState = {
   enabledIntervalIds: IntervalId[];
   mode: TrainingMode;
@@ -76,6 +87,9 @@ export function App() {
   );
   const [score, setScore] = useState<Score>(initialScore);
   const [resetSnapshot, setResetSnapshot] = useState<Score | null>(null);
+  const [apiConnection, setApiConnection] = useState<ApiConnection>({
+    state: "loading",
+  });
   const guessLockedRef = useRef(false);
   const resetUndoTimeoutRef = useRef<number | null>(null);
   const { audioState, play, playBetweenNotes, stop } = useIntervalAudio();
@@ -141,6 +155,33 @@ export function App() {
   }, [audioIsBusy, instrument, play, question]);
 
   useEffect(() => clearResetUndoTimeout, [clearResetUndoTimeout]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadApiStatus() {
+      try {
+        const response = await fetch("/api/status", {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}`);
+        }
+
+        const status = (await response.json()) as ApiStatus;
+        setApiConnection({ state: "connected", status });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setApiConnection({ state: "unavailable" });
+        }
+      }
+    }
+
+    void loadApiStatus();
+
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -485,6 +526,15 @@ export function App() {
                 <p className="eyebrow">Progress</p>
                 <h2>Today</h2>
               </div>
+              <div
+                className={`api-status api-status--${apiConnection.state}`}
+                aria-label="API connection"
+              >
+                <span className="api-status__label">API</span>
+                <span className="api-status__value">
+                  {getApiConnectionText(apiConnection)}
+                </span>
+              </div>
               <RecentStrip recent={score.recent} />
               <dl className="stat-grid">
                 <div className="stat">
@@ -600,6 +650,17 @@ function getFeedbackClass(
     return "";
   }
   return guess.correct ? "is-correct" : "is-wrong";
+}
+
+function getApiConnectionText(apiConnection: ApiConnection) {
+  switch (apiConnection.state) {
+    case "connected":
+      return apiConnection.status.message;
+    case "unavailable":
+      return "Unavailable";
+    case "loading":
+      return "Checking";
+  }
 }
 
 function trainingReducer(
