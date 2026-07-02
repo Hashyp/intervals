@@ -1,4 +1,8 @@
+using Intervals.Api.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddNpgsqlDbContext<IntervalsDbContext>("intervalsdb");
 
 builder.Services.AddHealthChecks();
 
