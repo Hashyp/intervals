@@ -1,0 +1,1385 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Intervals Social Login Architecture</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fa;
+        --panel: #ffffff;
+        --ink: #16202a;
+        --muted: #5c6674;
+        --line: #d9e0ea;
+        --soft: #eef3f8;
+        --accent: #0f766e;
+        --accent-ink: #134e4a;
+        --warn-bg: #fff7ed;
+        --warn-line: #fed7aa;
+        --ok-bg: #ecfdf5;
+        --ok-line: #a7f3d0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        margin: 0 auto;
+        max-width: 1120px;
+        padding: 48px 24px 72px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 2.35rem;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        border-bottom: 1px solid var(--line);
+        font-size: 1.45rem;
+        margin-top: 36px;
+        padding-bottom: 10px;
+      }
+
+      h3 {
+        font-size: 1.06rem;
+        margin-top: 22px;
+      }
+
+      p {
+        margin: 12px 0;
+      }
+
+      a {
+        color: var(--accent-ink);
+      }
+
+      table {
+        border-collapse: collapse;
+        margin: 16px 0;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--soft);
+        font-weight: 700;
+      }
+
+      code {
+        background: var(--soft);
+        border: 1px solid #dde5ee;
+        border-radius: 4px;
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.92em;
+        padding: 1px 5px;
+      }
+
+      pre {
+        background: #101923;
+        border-radius: 8px;
+        color: #e8eef6;
+        margin: 16px 0;
+        overflow-x: auto;
+        padding: 16px;
+      }
+
+      pre code {
+        background: transparent;
+        border: 0;
+        color: inherit;
+        padding: 0;
+      }
+
+      ul,
+      ol {
+        padding-left: 24px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .pill {
+        background: #e6fffb;
+        border: 1px solid #99f6e4;
+        border-radius: 999px;
+        color: var(--accent-ink);
+        display: inline-flex;
+        font-size: 0.88rem;
+        font-weight: 700;
+        padding: 4px 10px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 18px;
+      }
+
+      .callout {
+        background: var(--warn-bg);
+        border: 1px solid var(--warn-line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 16px 18px;
+      }
+
+      .success {
+        background: var(--ok-bg);
+        border-color: var(--ok-line);
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .flow {
+        counter-reset: step;
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .flow li {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 10px 0;
+        padding: 12px 14px 12px 46px;
+        position: relative;
+      }
+
+      .flow li::before {
+        background: var(--accent);
+        border-radius: 999px;
+        color: #ffffff;
+        content: counter(step);
+        counter-increment: step;
+        font-size: 0.82rem;
+        font-weight: 700;
+        height: 24px;
+        left: 14px;
+        line-height: 24px;
+        position: absolute;
+        text-align: center;
+        top: 12px;
+        width: 24px;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          padding: 32px 16px 56px;
+        }
+
+        h1 {
+          font-size: 1.82rem;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="pill">Architecture</span>
+        <h1>Social Login Implementation Architecture</h1>
+        <div class="meta">
+          <span>Status: Draft v0.1</span>
+          <span>Last reviewed: 2026-07-02</span>
+          <span>Branch: docs/social-login-functional-spec</span>
+          <span>Source: docs/social-login-functional-spec.html</span>
+        </div>
+      </header>
+
+      <section class="panel success">
+        <h2>Architecture Summary</h2>
+        <p>
+          Intervals should use server-owned authentication. The ASP.NET Core API
+          owns provider redirects, provider callbacks, account creation, account
+          linking, session cookies, and API authorization. The React app owns
+          only the login screen, route gating, and authenticated UI state.
+        </p>
+        <p>
+          The first release supports Google and X. Apple is deferred to phase 2.
+          There is no email/password signup and no email magic-link fallback.
+          Practice progress remains local in this auth release. Authentication
+          persistence uses PostgreSQL modeled and started by Aspire during local
+          development.
+        </p>
+      </section>
+
+      <section>
+        <h2>Current System Context</h2>
+        <ul>
+          <li>
+            Frontend: Vite and React in <code>src/</code>, currently loaded as
+            one training app.
+          </li>
+          <li>
+            Backend: ASP.NET Core minimal API in
+            <code>api/Intervals.Api/Program.cs</code>.
+          </li>
+          <li>
+            Orchestration: the repo currently uses file-based
+            <code>apphost.cs</code>. The target auth architecture should move
+            to a project-based AppHost so local orchestration and
+            <code>Aspire.Hosting.Testing</code> use the same resource graph.
+          </li>
+          <li>
+            Current API surface: <code>GET /api/status</code> and
+            <code>/health</code>.
+          </li>
+          <li>
+            Current persistence: none. Authentication requires adding an
+            Aspire-managed PostgreSQL database for users and provider links.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Core Decisions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Concern</th>
+              <th>Decision</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Authentication owner</td>
+              <td>ASP.NET Core API</td>
+              <td>
+                Keeps OAuth codes, provider tokens, cookies, account linking,
+                and authorization out of browser code.
+              </td>
+            </tr>
+            <tr>
+              <td>Browser session</td>
+              <td>HTTP-only secure cookie</td>
+              <td>
+                Best fit for same-origin Vite plus API deployment. No provider
+                tokens are stored in browser storage.
+              </td>
+            </tr>
+            <tr>
+              <td>Remember me</td>
+              <td>Persistent cookie when selected</td>
+              <td>
+                Satisfies the selected product behavior while keeping a shorter
+                default session for users who do not opt in.
+              </td>
+            </tr>
+            <tr>
+              <td>Account data</td>
+              <td>EF Core data model</td>
+              <td>
+                User and provider-link persistence is required for returning
+                login and future account linking.
+              </td>
+            </tr>
+            <tr>
+              <td>Initial database</td>
+              <td>Aspire-managed PostgreSQL</td>
+              <td>
+                Aspire already orchestrates Dockerized local resources, so the
+                implementation should use the same database engine locally that
+                it expects to use beyond local development.
+              </td>
+            </tr>
+            <tr>
+              <td>AppHost form</td>
+              <td>Project-based AppHost</td>
+              <td>
+                Enables <code>Aspire.Hosting.Testing</code> to launch the real
+                distributed app in tests while keeping the AppHost as the single
+                source of local resource wiring.
+              </td>
+            </tr>
+            <tr>
+              <td>Provider secrets</td>
+              <td>.NET user secrets for this phase</td>
+              <td>
+                Matches the current decision. Production still needs managed
+                secret storage before public launch.
+              </td>
+            </tr>
+            <tr>
+              <td>Cloud progress sync</td>
+              <td>Out of scope</td>
+              <td>
+                Authentication identifies users now. Server-side progress can be
+                designed after auth is stable.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Component Architecture</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>React Web App</h3>
+            <ul>
+              <li>Renders <code>/login</code> and authenticated training UI.</li>
+              <li>
+                Calls <code>GET /api/session</code> on startup to determine
+                auth state.
+              </li>
+              <li>
+                Posts login intent to <code>/auth/login/{provider}</code> with
+                <code>returnUrl</code> and <code>rememberMe</code>.
+              </li>
+              <li>
+                Shows user-safe messages for cancelled or failed provider login.
+              </li>
+              <li>Never handles provider access tokens or ID tokens.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>ASP.NET Core API</h3>
+            <ul>
+              <li>Configures cookie authentication and external providers.</li>
+              <li>Owns login start, callback, logout, and session endpoints.</li>
+              <li>Uses fallback authorization to deny anonymous API access.</li>
+              <li>Creates internal users and provider links.</li>
+              <li>Emits auth audit events without logging tokens.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Auth Database</h3>
+            <ul>
+              <li>Stores internal users.</li>
+              <li>Stores external provider links.</li>
+              <li>Stores minimal auth event audit records.</li>
+              <li>Does not store provider tokens in the initial release.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>External Providers</h3>
+            <ul>
+              <li>Google: OAuth/OIDC identity provider.</li>
+              <li>X: OAuth 2.0 authorization code with PKCE.</li>
+              <li>Apple: phase 2 provider slot, not visible in MVP UI.</li>
+              <li>Scopes are limited to identity and email data.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Target AppHost Project</h2>
+        <p>
+          Replace the root file-based <code>apphost.cs</code> with a
+          project-based AppHost before adding Aspire distributed-app tests. This
+          keeps Aspire as the single orchestration source for local development
+          and gives the test project a concrete AppHost project reference.
+        </p>
+        <pre><code>apphost/
+  Intervals.AppHost.csproj
+  Program.cs</code></pre>
+        <ul>
+          <li>
+            <code>Intervals.AppHost.csproj</code> uses
+            <code>Aspire.AppHost.Sdk</code>.
+          </li>
+          <li>
+            <code>Program.cs</code> contains the current Vite/API wiring plus
+            the new PostgreSQL resource model.
+          </li>
+          <li>
+            The AppHost project references or hosts the existing API project and
+            keeps <code>Aspire.Hosting.JavaScript</code> for
+            <code>AddViteApp()</code>.
+          </li>
+          <li>
+            The AppHost project adds <code>Aspire.Hosting.PostgreSQL</code> for
+            <code>AddPostgres()</code> and <code>AddDatabase()</code>.
+          </li>
+          <li>
+            The Aspire test project references
+            <code>Intervals.AppHost.csproj</code>, which enables
+            <code>DistributedApplicationTestingBuilder.CreateAsync&lt;...&gt;</code>
+            through the generated <code>Projects</code> namespace.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Aspire Resource Model</h2>
+        <p>
+          Local development should use Aspire's first-party PostgreSQL hosting
+          integration instead of a file-based or in-memory database. Aspire
+          should start the PostgreSQL container, manage host, port, password,
+          and connection string, and inject the database connection into the API
+          through <code>WithReference()</code>.
+        </p>
+        <pre><code>var postgres = builder.AddPostgres("postgres")
+    .WithDataVolume("intervals-postgres-data")
+    .WithLifetime(ContainerLifetime.Persistent);
+
+var intervalsDb = postgres.AddDatabase("intervalsdb");
+
+var api = builder.AddProject("api", "api/Intervals.Api/Intervals.Api.csproj")
+    .WithReference(intervalsDb)
+    .WaitFor(intervalsDb)
+    .WithHttpEndpoint()
+    .WithHttpHealthCheck("/health")
+    .WithExternalHttpEndpoints();</code></pre>
+        <ul>
+          <li>
+            The API should consume the injected
+            <code>ConnectionStrings__intervalsdb</code> value through the Aspire
+            Npgsql EF Core integration:
+            <code>builder.AddNpgsqlDbContext&lt;IntervalsDbContext&gt;("intervalsdb")</code>.
+          </li>
+          <li>
+            Do not model PostgreSQL host, port, username, password, or
+            connection string manually with <code>WithEnvironment()</code>.
+          </li>
+          <li>
+            Keep a persistent data volume so local accounts and provider links
+            survive AppHost restarts.
+          </li>
+          <li>
+            If a stale persistent PostgreSQL volume causes password
+            authentication failures after AppHost recreation, remove the stale
+            container and volume, then let Aspire recreate them.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Backend Project Structure</h2>
+        <p>
+          Keep the first implementation simple, but split auth concerns out of
+          <code>Program.cs</code> so the minimal API remains readable.
+        </p>
+        <pre><code>api/Intervals.Api/
+  Auth/
+    AuthEndpoints.cs
+    AuthOptions.cs
+    CurrentUser.cs
+    ExternalProviderNames.cs
+    ReturnUrlValidator.cs
+    XOAuthDefaults.cs
+  Data/
+    IntervalsDbContext.cs
+    Entities/
+      AppUser.cs
+      ExternalLogin.cs
+      AuthEvent.cs
+  Program.cs</code></pre>
+        <ul>
+          <li>
+            <code>AuthEndpoints</code> maps login, callback, logout, and session
+            endpoints.
+          </li>
+          <li>
+            <code>ReturnUrlValidator</code> allows only local relative return
+            URLs.
+          </li>
+          <li>
+            <code>IntervalsDbContext</code> owns user and provider-link tables.
+          </li>
+          <li>
+            <code>CurrentUser</code> reads the internal user id claim from the
+            authenticated principal.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Backend Middleware Pipeline</h2>
+        <pre><code>var builder = WebApplication.CreateBuilder(args);
+
+builder.AddNpgsqlDbContext&lt;IntervalsDbContext&gt;("intervalsdb");
+builder.Services.AddAuthentication(...);
+builder.Services.AddAuthorization(options =&gt;
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+builder.Services.AddAntiforgery(...);
+builder.Services.AddRateLimiter(...);
+builder.Services.AddHealthChecks();
+
+var app = builder.Build();
+
+app.UseForwardedHeaders();
+app.UseHttpsRedirection();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapAuthEndpoints();
+app.MapGet("/api/session", ...).RequireAuthorization();
+app.MapGet("/api/status", ...).RequireAuthorization();
+app.MapHealthChecks("/health").AllowAnonymous();
+
+app.Run();</code></pre>
+        <div class="callout">
+          <p>
+            <code>/health</code> may be anonymous only when it is private to
+            Aspire, a load balancer, or platform health checks. If the endpoint
+            is publicly reachable, protect it at the platform layer or require
+            authentication.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Authentication Configuration</h2>
+        <h3>Cookie Schemes</h3>
+        <ul>
+          <li>
+            Main application cookie: <code>Intervals.App</code>, HTTP-only,
+            secure in non-development, <code>SameSite=Lax</code>.
+          </li>
+          <li>
+            External temporary cookie: used only during provider callback flow.
+          </li>
+          <li>
+            Default session lifetime: configurable, recommended 8 hours.
+          </li>
+          <li>
+            Remember-me lifetime: configurable, recommended 30 days.
+          </li>
+          <li>
+            Sliding expiration: enabled for app cookie, bounded by the
+            persistent remember-me expiration.
+          </li>
+        </ul>
+
+        <h3>Provider Schemes</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Scheme</th>
+              <th>Handler</th>
+              <th>Implementation Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>Google</code></td>
+              <td>Google or OIDC provider middleware</td>
+              <td>
+                Configure client id and secret from user secrets. Request
+                <code>openid</code>, <code>email</code>, and
+                <code>profile</code>. Use the stable provider subject claim as
+                <code>ProviderUserId</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>X</code></td>
+              <td>Generic OAuth handler with PKCE</td>
+              <td>
+                Configure authorization endpoint, token endpoint, userinfo
+                endpoint, <code>users.read</code>, and
+                <code>users.email</code>. Set <code>UsePkce = true</code>. Map
+                the stable X user id as <code>ProviderUserId</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>User Secrets</h3>
+        <pre><code>dotnet user-secrets init --project api/Intervals.Api
+dotnet user-secrets set "Authentication:Google:ClientId" "&lt;google-client-id&gt;" --project api/Intervals.Api
+dotnet user-secrets set "Authentication:Google:ClientSecret" "&lt;google-client-secret&gt;" --project api/Intervals.Api
+dotnet user-secrets set "Authentication:X:ClientId" "&lt;x-client-id&gt;" --project api/Intervals.Api
+dotnet user-secrets set "Authentication:X:ClientSecret" "&lt;x-client-secret&gt;" --project api/Intervals.Api</code></pre>
+      </section>
+
+      <section>
+        <h2>Data Model</h2>
+        <h3>Tables</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Table</th>
+              <th>Fields</th>
+              <th>Constraints</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>AppUsers</code></td>
+              <td>
+                <code>Id</code>, <code>DisplayName</code>,
+                <code>Email</code>, <code>EmailNormalized</code>,
+                <code>AvatarUrl</code>, <code>CreatedUtc</code>,
+                <code>LastLoginUtc</code>, <code>DisabledUtc</code>
+              </td>
+              <td>
+                Primary key on <code>Id</code>. Index on
+                <code>EmailNormalized</code> for support and merge guidance, but
+                do not make email globally unique in MVP.
+              </td>
+            </tr>
+            <tr>
+              <td><code>ExternalLogins</code></td>
+              <td>
+                <code>Id</code>, <code>UserId</code>, <code>Provider</code>,
+                <code>ProviderUserId</code>, <code>Email</code>,
+                <code>EmailVerified</code>, <code>DisplayName</code>,
+                <code>AvatarUrl</code>, <code>CreatedUtc</code>,
+                <code>LastLoginUtc</code>
+              </td>
+              <td>
+                Foreign key to <code>AppUsers</code>. Unique index on
+                <code>Provider</code> plus <code>ProviderUserId</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>AuthEvents</code></td>
+              <td>
+                <code>Id</code>, <code>UserId</code>,
+                <code>Provider</code>, <code>EventType</code>,
+                <code>OccurredUtc</code>, <code>Success</code>,
+                <code>FailureCode</code>, <code>CorrelationId</code>
+              </td>
+              <td>
+                Optional <code>UserId</code>. No raw provider payloads, tokens,
+                authorization codes, or secrets.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Entity Rules</h3>
+        <ul>
+          <li>
+            Internal user ids are immutable and become the application identity.
+          </li>
+          <li>
+            Provider name plus provider user id is the login identity key.
+          </li>
+          <li>
+            Email is useful for display and account recovery support, but not
+            trusted as the only account key.
+          </li>
+          <li>
+            Provider access tokens are not stored in the initial release.
+          </li>
+          <li>
+            If a provider login returns an email matching another user, do not
+            merge automatically. Require an explicit account-linking flow later.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Backend Endpoints</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Path</th>
+              <th>Anonymous?</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/auth/login/{provider}</code></td>
+              <td>Yes</td>
+              <td>
+                Validates provider, return URL, and remember-me flag, then
+                starts the external provider challenge.
+              </td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/auth/callback/{provider}</code></td>
+              <td>Yes</td>
+              <td>
+                Completes provider login, creates or updates account records,
+                issues the app cookie, and redirects to the safe return URL.
+              </td>
+            </tr>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/auth/logout</code></td>
+              <td>No</td>
+              <td>Invalidates the app cookie and redirects to login.</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/session</code></td>
+              <td>No</td>
+              <td>
+                Returns current authenticated user summary and enabled
+                providers.
+              </td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/status</code></td>
+              <td>No</td>
+              <td>Existing status endpoint, now requiring auth.</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/health</code></td>
+              <td>Private infrastructure only</td>
+              <td>
+                Health probe for Aspire or hosting infrastructure, not a public
+                anonymous app endpoint.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Session Response</h3>
+        <pre><code>{
+  "user": {
+    "id": "018f5f5e-9f9f-7b91-9d89-2b9089b2e641",
+    "displayName": "Avery Example",
+    "email": "avery@example.com",
+    "avatarUrl": "https://provider.example/avatar.png"
+  },
+  "providers": [
+    { "id": "google", "label": "Google", "linked": true },
+    { "id": "x", "label": "X", "linked": false }
+  ]
+}</code></pre>
+      </section>
+
+      <section>
+        <h2>Login Flow</h2>
+        <ol class="flow">
+          <li>
+            User visits <code>/</code>. React calls
+            <code>GET /api/session</code>.
+          </li>
+          <li>
+            API returns <code>401</code>. React navigates to
+            <code>/login?returnUrl=/</code>.
+          </li>
+          <li>
+            User selects Google or X and optionally selects
+            <code>Remember me</code>.
+          </li>
+          <li>
+            React posts to <code>/auth/login/{provider}</code> with a local
+            relative return URL and remember-me value.
+          </li>
+          <li>
+            API validates input, stores protected auth properties, generates
+            provider state, and redirects to the provider.
+          </li>
+          <li>
+            Provider authenticates the user and redirects to
+            <code>/auth/callback/{provider}</code>.
+          </li>
+          <li>
+            API validates state, exchanges code, reads identity claims, and
+            creates or updates <code>AppUsers</code> and
+            <code>ExternalLogins</code>.
+          </li>
+          <li>
+            API issues the application cookie with persistent expiration only
+            when remember-me was selected.
+          </li>
+          <li>
+            API redirects to the safe return URL. React reloads session state
+            from <code>/api/session</code>.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Authorization Model</h2>
+        <ul>
+          <li>
+            Configure a fallback authorization policy requiring authenticated
+            users.
+          </li>
+          <li>
+            Apply <code>AllowAnonymous()</code> only to login start, provider
+            callbacks, static login assets, and private infrastructure health.
+          </li>
+          <li>
+            Apply <code>RequireAuthorization()</code> explicitly to all
+            <code>/api/*</code> endpoints for readability.
+          </li>
+          <li>
+            Reject anonymous API requests with <code>401</code>. Use
+            <code>403</code> only for future authenticated users who lack a
+            required permission.
+          </li>
+          <li>
+            Include internal user id in the auth cookie claims as
+            <code>sub</code> or a namespaced application claim. Do not use email
+            as the primary authorization subject.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Frontend Architecture</h2>
+        <h3>Suggested Structure</h3>
+        <pre><code>src/
+  auth/
+    AuthProvider.tsx
+    LoginPage.tsx
+    ProtectedApp.tsx
+    sessionApi.ts
+    returnUrl.ts
+  App.tsx
+  main.tsx</code></pre>
+        <ul>
+          <li>
+            <code>AuthProvider</code> loads <code>/api/session</code> once on
+            startup and exposes <code>loading</code>, <code>authenticated</code>,
+            and <code>user</code>.
+          </li>
+          <li>
+            <code>ProtectedApp</code> renders the existing training UI only
+            after session validation succeeds.
+          </li>
+          <li>
+            <code>LoginPage</code> displays Google and X buttons plus the
+            remember-me checkbox.
+          </li>
+          <li>
+            <code>sessionApi</code> sends same-origin fetch requests with
+            <code>credentials: "same-origin"</code>.
+          </li>
+          <li>
+            <code>returnUrl</code> keeps return URLs local and relative before
+            submitting them to the backend.
+          </li>
+        </ul>
+
+        <h3>Frontend States</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>State</th>
+              <th>UI Behavior</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Session loading</td>
+              <td>Show a compact loading state. Do not render training UI.</td>
+            </tr>
+            <tr>
+              <td>Anonymous</td>
+              <td>Show login page only.</td>
+            </tr>
+            <tr>
+              <td>Authenticated</td>
+              <td>Render training UI and account/logout controls.</td>
+            </tr>
+            <tr>
+              <td>Provider cancelled</td>
+              <td>Return to login page with a neutral retry message.</td>
+            </tr>
+            <tr>
+              <td>Provider error</td>
+              <td>
+                Show a user-safe error and support correlation id when
+                available.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Security Controls</h2>
+        <ul>
+          <li>
+            Validate all return URLs on the backend. Accept only relative local
+            paths such as <code>/</code> or <code>/?mode=mixed</code>.
+          </li>
+          <li>
+            Use provider <code>state</code> and PKCE where supported. X must use
+            PKCE.
+          </li>
+          <li>
+            Do not store provider access tokens, refresh tokens, authorization
+            codes, ID tokens, or raw provider payloads.
+          </li>
+          <li>
+            Protect future state-changing API calls with antiforgery controls
+            because browser auth uses cookies.
+          </li>
+          <li>
+            Configure forwarded headers before auth in deployed environments so
+            redirect URI generation uses the correct external scheme and host.
+          </li>
+          <li>
+            Rate-limit login start, callback failure, logout, and session
+            endpoints.
+          </li>
+          <li>
+            Persist ASP.NET Core data-protection keys in production so cookies
+            remain valid across restarts and multiple instances.
+          </li>
+          <li>
+            Log auth events with correlation ids, but never tokens, secrets, or
+            provider authorization codes.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Aspire and Local Development</h2>
+        <ul>
+          <li>
+            Add the first-party PostgreSQL hosting integration to the AppHost
+            and model an <code>intervalsdb</code> database for auth data.
+          </li>
+          <li>
+            Use <code>WithReference(intervalsDb)</code> and
+            <code>WaitFor(intervalsDb)</code> on the API resource so Aspire
+            injects the connection string and starts the API only after
+            PostgreSQL is ready.
+          </li>
+          <li>
+            Use a persistent PostgreSQL data volume for local development so
+            user accounts and provider links survive AppHost restarts.
+          </li>
+          <li>
+            Keep provider credentials in .NET user secrets for
+            <code>api/Intervals.Api</code>.
+          </li>
+          <li>
+            Register provider callback URLs for the API endpoint used during
+            local development. Example: <code>https://localhost:&lt;api-port&gt;/auth/callback/google</code>
+            and <code>https://localhost:&lt;api-port&gt;/auth/callback/x</code>.
+          </li>
+          <li>
+            Vite should call the API through the same origin/proxy path used by
+            Aspire where possible, so cookies behave like production.
+          </li>
+          <li>
+            If Aspire exposes separate web and API origins locally, configure
+            CORS only for the known Vite origin and allow credentials.
+          </li>
+          <li>
+            Before public production launch, replace user secrets with the
+            hosting platform's managed secret store and register final public
+            callback URLs.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Package Additions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Package</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>Aspire.Hosting.PostgreSQL</code></td>
+              <td>
+                AppHost integration for Dockerized PostgreSQL,
+                <code>AddPostgres()</code>, and <code>AddDatabase()</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>Microsoft.EntityFrameworkCore</code></td>
+              <td>Auth persistence model.</td>
+            </tr>
+            <tr>
+              <td><code>Aspire.Npgsql.EntityFrameworkCore.PostgreSQL</code></td>
+              <td>
+                API-side Aspire client integration for PostgreSQL EF Core,
+                health checks, retries, logging, and telemetry.
+              </td>
+            </tr>
+            <tr>
+              <td><code>Npgsql.EntityFrameworkCore.PostgreSQL</code></td>
+              <td>PostgreSQL EF Core provider for auth persistence.</td>
+            </tr>
+            <tr>
+              <td><code>Microsoft.EntityFrameworkCore.Design</code></td>
+              <td>Migrations and design-time tooling.</td>
+            </tr>
+            <tr>
+              <td><code>Microsoft.AspNetCore.Authentication.Google</code></td>
+              <td>Google external login handler.</td>
+            </tr>
+            <tr>
+              <td><code>Testcontainers.PostgreSql</code></td>
+              <td>
+                Default PostgreSQL container for backend integration tests that
+                run the API through <code>WebApplicationFactory</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>Aspire.Hosting.Testing</code></td>
+              <td>
+                Full distributed-app testing package for the project-based
+                AppHost test layer.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          The generic OAuth handler used for X is part of ASP.NET Core
+          authentication. If the final .NET SDK layout requires an explicit
+          package, add the matching
+          <code>Microsoft.AspNetCore.Authentication.OAuth</code> package version.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation Plan</h2>
+        <ol>
+          <li>
+            Convert the current file-based <code>apphost.cs</code> to a
+            project-based AppHost so tests can reference the AppHost through the
+            generated <code>Projects</code> namespace.
+          </li>
+          <li>
+            Add <code>Aspire.Hosting.PostgreSQL</code> to the AppHost, create
+            the <code>postgres</code> server resource and
+            <code>intervalsdb</code> database, then reference that database from
+            the API with <code>WithReference()</code> and
+            <code>WaitFor()</code>.
+          </li>
+          <li>
+            Add PostgreSQL EF Core packages, create
+            <code>IntervalsDbContext</code>, add entities, and create the first
+            migration.
+          </li>
+          <li>
+            Add auth options, user-secrets keys, cookie auth, Google auth, and X
+            OAuth 2.0 with PKCE.
+          </li>
+          <li>
+            Add <code>AuthEndpoints</code> for login, callback, logout, and
+            session.
+          </li>
+          <li>
+            Protect <code>/api/status</code> and configure fallback
+            authorization.
+          </li>
+          <li>
+            Add React auth provider, login page, remember-me checkbox, and
+            protected training shell.
+          </li>
+          <li>
+            Add user-safe login failure and cancellation messages.
+          </li>
+          <li>
+            Add integration tests for anonymous rejection, authenticated
+            session, status access, callback state mismatch, account creation,
+            returning login, and logout using <code>WebApplicationFactory</code>
+            plus <code>Testcontainers.PostgreSql</code>.
+          </li>
+          <li>
+            Add Aspire distributed-app tests with
+            <code>Aspire.Hosting.Testing</code> against the project-based
+            AppHost for full-system smoke coverage.
+          </li>
+          <li>
+            Run local Aspire/Vite/API verification with Google and X developer
+            apps configured in user secrets.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Testing Strategy Decision</h2>
+        <p>
+          Use two complementary integration-test styles. For backend auth
+          behavior, the default is <code>WebApplicationFactory</code> plus
+          <code>Testcontainers.PostgreSql</code>. For full-system smoke and
+          end-to-end tests, use Aspire testing through the project-based
+          AppHost.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Approach</th>
+              <th>Use For</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>WebApplicationFactory</code> + Testcontainers</td>
+              <td>
+                API auth integration tests: anonymous rejection, session
+                creation, logout, account creation, provider-link persistence,
+                and database constraints.
+              </td>
+              <td>
+                Fast enough for routine test runs, gives direct control over
+                API test configuration, and exercises real PostgreSQL semantics.
+              </td>
+            </tr>
+            <tr>
+              <td><code>Aspire.Hosting.Testing</code></td>
+              <td>
+                Distributed-app tests that start the AppHost, API, web frontend,
+                and PostgreSQL together.
+              </td>
+              <td>
+                Verifies the real Aspire resource graph, service discovery,
+                startup ordering, and cross-resource behavior.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <p>
+            Architecture decision: convert the current file-based
+            <code>apphost.cs</code> to a project-based AppHost.
+            <code>DistributedApplicationTestingBuilder</code> requires a
+            project-based AppHost reference, and this conversion makes the same
+            AppHost resource graph available to both local development and
+            full-system tests.
+          </p>
+        </div>
+        <div class="callout">
+          <p>
+            Scope boundary:
+            <code>DistributedApplicationTestingBuilder</code> requires a
+            separate-process, closed-box style. It is excellent for proving the
+            resource graph works, but it is not the best tool for detailed auth
+            edge cases that need fake auth schemes, direct API configuration, or
+            precise database reset control.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Test Architecture</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Tests</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Backend integration</td>
+              <td>
+                Default to <code>WebApplicationFactory</code> with test auth
+                schemes and <code>Testcontainers.PostgreSql</code> so tests use
+                disposable PostgreSQL and exercise the same provider as local
+                development.
+              </td>
+            </tr>
+            <tr>
+              <td>Aspire distributed integration</td>
+              <td>
+                Use <code>Aspire.Hosting.Testing</code> and
+                <code>DistributedApplicationTestingBuilder</code> for
+                full-system tests through the project-based AppHost.
+              </td>
+            </tr>
+            <tr>
+              <td>Backend unit</td>
+              <td>
+                Validate return URL handling, provider claim mapping, account
+                creation/update rules, and auth event recording.
+              </td>
+            </tr>
+            <tr>
+              <td>Frontend component</td>
+              <td>
+                Test login page rendering, remember-me submission, auth loading
+                state, anonymous state, authenticated state, and logout action.
+              </td>
+            </tr>
+            <tr>
+              <td>Manual provider verification</td>
+              <td>
+                Verify Google and X live provider flows locally after developer
+                app credentials are registered.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Implementation Risks</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Risk</th>
+              <th>Mitigation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>X email availability may vary by app access and user account.</td>
+              <td>
+                Treat email as optional. Use X provider user id as the durable
+                identity.
+              </td>
+            </tr>
+            <tr>
+              <td>Open redirect through <code>returnUrl</code>.</td>
+              <td>
+                Accept only local relative paths and reject URLs with schemes,
+                hosts, backslashes, or protocol-relative prefixes.
+              </td>
+            </tr>
+            <tr>
+              <td>Auth cookie broken behind proxy.</td>
+              <td>
+                Configure forwarded headers and provider callback URLs for the
+                real external origin.
+              </td>
+            </tr>
+            <tr>
+              <td>Anonymous API accidentally added later.</td>
+              <td>
+                Use fallback authorization plus tests proving anonymous
+                <code>/api/*</code> requests return <code>401</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>User loses access to only linked provider.</td>
+              <td>
+                Accepted for MVP. Add provider linking or recovery in a later
+                account-management phase.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Done Criteria</h2>
+        <ol>
+          <li>
+            Signed-out users can reach only login and auth flow endpoints.
+          </li>
+          <li>
+            Signed-out <code>/api/status</code> and
+            <code>/api/session</code> return <code>401</code>.
+          </li>
+          <li>
+            Google login creates and reuses an internal user account.
+          </li>
+          <li>
+            X login creates and reuses an internal user account.
+          </li>
+          <li>
+            Remember-me creates a persistent session; normal login creates the
+            standard session.
+          </li>
+          <li>
+            Logout invalidates API access until the user signs in again.
+          </li>
+          <li>
+            Provider secrets are stored in .NET user secrets locally and never
+            committed.
+          </li>
+          <li>
+            Provider tokens, auth codes, and secrets do not appear in browser
+            storage, API responses, or logs.
+          </li>
+          <li>
+            Automated backend and frontend tests cover the protected auth
+            boundary and core session behavior.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Reference Documents</h2>
+        <ul>
+          <li>
+            <a href="./social-login-functional-spec.html"
+              >Social Login Functional Specification</a
+            >
+          </li>
+          <li>
+            <a href="https://developers.google.com/identity/openid-connect/openid-connect"
+              >Google OpenID Connect documentation</a
+            >
+          </li>
+          <li>
+            <a href="https://docs.x.com/fundamentals/authentication/oauth-2-0/authorization-code"
+              >X OAuth 2.0 authorization code with PKCE documentation</a
+            >
+          </li>
+          <li>
+            <a href="https://learn.microsoft.com/en-us/aspnet/core/security/authentication/social/"
+              >ASP.NET Core external provider authentication documentation</a
+            >
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
