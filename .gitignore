@@ -12,4 +12,10 @@ obj/
 !.env.example
 .DS_Store
 .codex
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/google-oauth-console-setup/
+!.agents/skills/google-oauth-console-setup/**
+!.agents/skills/x-oauth-console-setup/
+!.agents/skills/x-oauth-console-setup/**

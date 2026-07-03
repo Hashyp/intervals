@@ -1,0 +1,4 @@
+interface:
+  display_name: "Google OAuth Console Setup"
+  short_description: "Create and import Google OAuth secrets"
+  default_prompt: "Use $google-oauth-console-setup to create a Google OAuth web client and import its downloaded client secret JSON for local development."

@@ -16,7 +16,7 @@ var intervalsDb = postgres.AddDatabase("intervalsdb");
 var api = builder.AddProject("api", "../api/Intervals.Api/Intervals.Api.csproj")
     .WithReference(intervalsDb)
     .WaitFor(intervalsDb)
-    .WithHttpEndpoint()
+    .WithHttpEndpoint(name: "http", port: 5199, targetPort: 8080)
     .WithHttpHealthCheck("/health")
     .WithExternalHttpEndpoints();
 

@@ -103,7 +103,7 @@ The port can change between runs. To keep redirect URIs stable, pin the API HTTP
 port in `apphost/Program.cs`:
 
 ```csharp
-.WithHttpEndpoint(name: "http", port: 5199, target: 8080)
+.WithHttpEndpoint(name: "http", port: 5199, targetPort: 8080)
 ```
 
 ### Google setup
@@ -121,7 +121,10 @@ port in `apphost/Program.cs`:
 2. Enable **OAuth 2.0** (Web App) and turn on **Authorize apps with PKCE**
    (the app uses PKCE). Scopes used: `users.read`, `users.email`.
 3. Set the redirect URI to `http://localhost:<api-port>/auth/callback/x`.
-4. Copy the OAuth 2.0 Client ID and Client Secret. (X email availability varies,
+4. Set the **Website URL** to a complete public `https://` URL, such as the
+   production/staging site or public project page. X may reject `localhost` here
+   even when the callback URI is local.
+5. Copy the OAuth 2.0 Client ID and Client Secret. (X email availability varies,
    so the app treats email as optional and keys on the stable X user id.)
 
 ### Store secrets locally

@@ -1,0 +1,4 @@
+interface:
+  display_name: "X OAuth Console Setup"
+  short_description: "Configure and import X OAuth secrets"
+  default_prompt: "Use $x-oauth-console-setup to configure an X OAuth app and import its Client ID and Client Secret for local development."
