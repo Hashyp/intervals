@@ -7,6 +7,7 @@
     <IsAspireHost>true</IsAspireHost>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UserSecretsId>intervals-apphost-social-login</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
