@@ -19,6 +19,11 @@ export default defineConfig({
             changeOrigin: true,
             secure: false,
           },
+          "/auth": {
+            target: apiTarget,
+            changeOrigin: true,
+            secure: false,
+          },
         }
       : undefined,
   },
