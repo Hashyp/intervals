@@ -1,4 +1,7 @@
 using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -140,6 +143,7 @@ public static class AuthExtensions
                 options.ClaimActions.MapJsonSubKey(System.Security.Claims.ClaimTypes.Email, "data", "email");
                 options.Events = new OAuthEvents
                 {
+                    OnCreatingTicket = PopulateXClaimsAsync,
                     OnRemoteFailure = context =>
                     {
                         var code = IsCancellation(context.Failure)
@@ -215,6 +219,30 @@ public static class AuthExtensions
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/json";
         return context.Response.WriteAsJsonAsync(new ApiError(code, message, context.GetCorrelationId()));
+    }
+
+    private static async Task PopulateXClaimsAsync(OAuthCreatingTicketContext context)
+    {
+        if (string.IsNullOrWhiteSpace(context.AccessToken))
+        {
+            throw new InvalidOperationException("X OAuth did not return an access token.");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+
+        using var response = await context.Backchannel.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            context.HttpContext.RequestAborted);
+        response.EnsureSuccessStatusCode();
+
+        await using var body = await response.Content.ReadAsStreamAsync(context.HttpContext.RequestAborted);
+        using var user = await JsonDocument.ParseAsync(
+            body,
+            cancellationToken: context.HttpContext.RequestAborted);
+        context.RunClaimActions(user.RootElement);
     }
 
     private static bool IsCancellation(Exception? failure) =>

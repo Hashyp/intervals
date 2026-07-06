@@ -8,6 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" Version="13.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="*" />
+    <PackageReference Include="Microsoft.Playwright" Version="*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="*" />
     <PackageReference Include="xunit" Version="*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="*" />
