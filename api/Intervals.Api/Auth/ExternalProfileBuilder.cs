@@ -41,6 +41,13 @@ public sealed class ExternalProfileBuilder : IExternalProfileBuilder
                 ?? principal.FindFirst("sub")?.Value;
         }
 
+        if (provider == AuthProviderNames.Microsoft)
+        {
+            return principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? principal.FindFirst("oid")?.Value
+                ?? principal.FindFirst("sub")?.Value;
+        }
+
         if (provider == AuthProviderNames.X)
         {
             return principal.FindFirst(ClaimTypes.NameIdentifier)?.Value

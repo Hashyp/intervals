@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -11,9 +12,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Intervals.Api.Data;
 using Intervals.Api.Data.Entities;
 
 namespace Intervals.Api.Auth;
@@ -78,6 +82,78 @@ public static class AuthExtensions
                     context.Response.Redirect(context.RedirectUri);
                     return Task.CompletedTask;
                 },
+                OnValidatePrincipal = async context =>
+                {
+                    var principal = context.Principal;
+                    if (principal is null)
+                    {
+                        return;
+                    }
+
+                    var userIdClaim = principal.FindFirst(CurrentUser.UserIdClaimType)?.Value;
+                    if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                    {
+                        return;
+                    }
+
+                    var cache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+                    var cacheKey = SecurityStampCacheKey(userId);
+
+                    try
+                    {
+                        if (!cache.TryGetValue(cacheKey, out SecurityStampCacheEntry cached))
+                        {
+                            var scopeFactory = context.HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
+                            using var scope = scopeFactory.CreateScope();
+                            var db = scope.ServiceProvider.GetRequiredService<IntervalsDbContext>();
+                            var record = await db.AppUsers
+                                .AsNoTracking()
+                                .Where(u => u.Id == userId)
+                                .Select(u => new { u.SecurityStamp, u.DisabledUtc })
+                                .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+                            cached = record is null
+                                ? SecurityStampCacheEntry.Missing
+                                : new SecurityStampCacheEntry(true, record.SecurityStamp, record.DisabledUtc);
+                            cache.Set(cacheKey, cached, TimeSpan.FromMinutes(1));
+                        }
+
+                        if (!cached.Exists || cached.DisabledUtc is not null)
+                        {
+                            // Deleted or disabled (including merged-secondary) accounts must not
+                            // keep using an existing cookie, even before the stamp is checked.
+                            context.RejectPrincipal();
+                            return;
+                        }
+
+                        var stampClaim = principal.FindFirst(AuthEndpoints.SecurityStampClaimType)?.Value;
+                        if (stampClaim is null)
+                        {
+                            // Principals without a security-stamp claim (e.g. the test-login
+                            // endpoint) skip stamp enforcement; the existence/disabled checks
+                            // above still apply.
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(cached.Stamp))
+                        {
+                            // The user has never had a security stamp; nothing to invalidate yet.
+                            return;
+                        }
+
+                        // Once a non-empty DB stamp exists, an empty or differing cookie claim
+                        // means the cookie predates the stamp-rotating event (password reset,
+                        // change, or merge) and must be treated as stale.
+                        if (string.IsNullOrEmpty(stampClaim)
+                            || !string.Equals(cached.Stamp, stampClaim, StringComparison.Ordinal))
+                        {
+                            context.RejectPrincipal();
+                        }
+                    }
+                    catch
+                    {
+                        // Fail open: a DB error must not log users out.
+                    }
+                },
             };
         });
 
@@ -99,6 +175,36 @@ public static class AuthExtensions
                 options.ClientId = googleClientId!;
                 options.ClientSecret = googleSection["ClientSecret"] ?? string.Empty;
                 options.CallbackPath = "/auth/callback/google";
+                options.SignInScheme = ExternalCookieScheme;
+                options.SaveTokens = false;
+                options.Scope.Clear();
+                options.Scope.Add("openid");
+                options.Scope.Add("email");
+                options.Scope.Add("profile");
+                options.Events = new OAuthEvents
+                {
+                    OnRemoteFailure = context =>
+                    {
+                        var code = IsCancellation(context.Failure)
+                            ? AuthResultCodes.Cancelled
+                            : AuthResultCodes.ProviderError;
+                        context.HandleResponse();
+                        context.Response.Redirect(AuthRedirect.Build(webBaseUrl, authOptions.LoginPath, code));
+                        return Task.CompletedTask;
+                    },
+                };
+            });
+        }
+
+        var microsoftSection = builder.Configuration.GetSection("Authentication:Microsoft");
+        var microsoftClientId = microsoftSection["ClientId"];
+        if (!string.IsNullOrWhiteSpace(microsoftClientId))
+        {
+            authentication.AddMicrosoftAccount(AuthProviderNames.MicrosoftScheme, options =>
+            {
+                options.ClientId = microsoftClientId!;
+                options.ClientSecret = microsoftSection["ClientSecret"] ?? string.Empty;
+                options.CallbackPath = "/auth/callback/microsoft";
                 options.SignInScheme = ExternalCookieScheme;
                 options.SaveTokens = false;
                 options.Scope.Clear();
@@ -164,6 +270,7 @@ public static class AuthExtensions
         builder.Services.AddScoped<IPasswordAccountService, PasswordAccountService>();
         builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.PasswordHasher<AppUser>>();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddMemoryCache();
 
         builder.Services.AddAuthorization(options =>
         {
@@ -187,6 +294,20 @@ public static class AuthExtensions
             options.AddFixedWindowLimiter(RateLimitPolicy, window =>
             {
                 window.PermitLimit = 60;
+                window.Window = TimeSpan.FromMinutes(1);
+                window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                window.QueueLimit = 0;
+            });
+            options.AddFixedWindowLimiter("verification", window =>
+            {
+                window.PermitLimit = 5;
+                window.Window = TimeSpan.FromMinutes(1);
+                window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                window.QueueLimit = 0;
+            });
+            options.AddFixedWindowLimiter("password-reset", window =>
+            {
+                window.PermitLimit = 5;
                 window.Window = TimeSpan.FromMinutes(1);
                 window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
                 window.QueueLimit = 0;
@@ -215,6 +336,13 @@ public static class AuthExtensions
 
     public static IEndpointConventionBuilder RateLimit(this IEndpointConventionBuilder builder) =>
         builder.WithMetadata(new EnableRateLimitingAttribute(RateLimitPolicy));
+
+    public static string SecurityStampCacheKey(Guid userId) => $"intervals:security_stamp:{userId}";
+
+    internal sealed record SecurityStampCacheEntry(bool Exists, string? Stamp, DateTimeOffset? DisabledUtc)
+    {
+        public static SecurityStampCacheEntry Missing { get; } = new(false, null, null);
+    }
 
     private static bool IsApiRequest(HttpRequest request) => request.Path.StartsWithSegments("/api");
 

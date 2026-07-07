@@ -14,6 +14,7 @@ public sealed class IntervalsDbContext : DbContext
     public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
     public DbSet<PasswordCredential> PasswordCredentials => Set<PasswordCredential>();
     public DbSet<AuthEvent> AuthEvents => Set<AuthEvent>();
+    public DbSet<AuthActionToken> AuthActionTokens => Set<AuthActionToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +27,7 @@ public sealed class IntervalsDbContext : DbContext
             entity.Property(e => e.EmailNormalized).HasMaxLength(320);
             entity.Property(e => e.AvatarUrl).HasMaxLength(2048);
             entity.HasIndex(e => e.EmailNormalized);
+            entity.HasIndex(e => e.MergedIntoUserId);
         });
 
         modelBuilder.Entity<ExternalLogin>(entity =>
@@ -69,6 +71,24 @@ public sealed class IntervalsDbContext : DbContext
             entity.Property(e => e.FailureCode).HasMaxLength(64);
             entity.Property(e => e.CorrelationId).HasMaxLength(64);
             entity.HasIndex(e => e.OccurredUtc);
+        });
+
+        modelBuilder.Entity<AuthActionToken>(entity =>
+        {
+            entity.ToTable("AuthActionTokens");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Purpose).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Email).HasMaxLength(320);
+            entity.Property(e => e.EmailNormalized).HasMaxLength(320);
+            entity.Property(e => e.CorrelationId).HasMaxLength(64);
+            entity.HasIndex(e => new { e.Purpose, e.TokenHash });
+            entity.HasIndex(e => new { e.UserId, e.Purpose });
+            entity
+                .HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

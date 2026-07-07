@@ -12,11 +12,16 @@ const ERROR_MESSAGES: Record<string, string> = {
   provider_error:
     "The sign-in provider could not complete the request. Please retry.",
   unknown: "Something went wrong during sign-in. Please retry.",
+  email_verified: "Your email has been verified. You can sign in now.",
+  verification_failed:
+    "We couldn't verify that link. It may have expired or already been used.",
+  disabled: "This account has been disabled.",
 };
 
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: "Incorrect email or password.",
   locked_out: "Too many attempts. Please try again in a few minutes.",
+  disabled: "This account has been disabled.",
 };
 
 const REGISTER_ERROR_MESSAGES: Record<string, string> = {
@@ -136,6 +141,21 @@ export function LoginPage() {
             Continue with Google
           </button>
         </form>
+        <form method="post" action="/auth/login/microsoft" className="auth-form">
+          <input type="hidden" name="returnUrl" value={returnUrl} />
+          <label className="auth-remember">
+            <input
+              type="checkbox"
+              name="rememberMe"
+              value="true"
+              defaultChecked={false}
+            />
+            <span>Remember me</span>
+          </label>
+          <button type="submit" className="auth-button auth-button--microsoft">
+            Continue with Microsoft
+          </button>
+        </form>
         <form method="post" action="/auth/login/x" className="auth-form">
           <input type="hidden" name="returnUrl" value={returnUrl} />
           <input type="hidden" name="rememberMe" value="false" />
@@ -171,6 +191,11 @@ export function LoginPage() {
                 required
               />
             </div>
+            <p className="auth-toggle">
+              <a className="auth-toggle__button" href="/forgot-password">
+                Forgot password?
+              </a>
+            </p>
             <label className="auth-remember">
               <input
                 type="checkbox"

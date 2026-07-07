@@ -6,7 +6,7 @@ export type SessionUser = {
   emailVerified: boolean;
 };
 
-export type ProviderId = "google" | "x" | "password";
+export type ProviderId = "google" | "microsoft" | "x" | "password";
 
 export type ProviderStatus = {
   id: ProviderId;
@@ -112,4 +112,82 @@ export async function loginWithPassword(
   rememberMe: boolean,
 ): Promise<void> {
   await postAuthForm("/auth/login/password", { email, password, rememberMe });
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await postAuthForm("/auth/password/forgot", { email });
+}
+
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<void> {
+  await postAuthForm("/auth/password/reset", { token, password });
+}
+
+export type AccountProvider = {
+  id: ProviderId;
+  label: string;
+  linked: boolean;
+  email: string | null;
+  lastLoginUtc: string | null;
+};
+
+export type AccountDetail = {
+  userId: string;
+  displayName: string;
+  email: string | null;
+  emailVerified: boolean;
+  hasPassword: boolean;
+  providers: AccountProvider[];
+};
+
+export async function getAccount(): Promise<AccountDetail> {
+  const response = await fetch("/auth/account", { credentials: "same-origin" });
+  if (!response.ok) {
+    const body = await readErrorBody(response);
+    throw new AuthApiError(
+      response.status,
+      body.code ?? "unknown",
+      body.message ?? "Failed to load account",
+    );
+  }
+  return (await response.json()) as AccountDetail;
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await postAuthForm("/auth/account/password/change", {
+    currentPassword,
+    newPassword,
+  });
+}
+
+export async function addPassword(
+  email: string,
+  newPassword: string,
+): Promise<void> {
+  await postAuthForm("/auth/account/password/add", { email, newPassword });
+}
+
+export async function unlinkProvider(provider: string): Promise<void> {
+  const token = await getAntiforgeryToken();
+  const response = await fetch(
+    `/auth/account/providers/${encodeURIComponent(provider)}`,
+    {
+      method: "DELETE",
+      credentials: "same-origin",
+      headers: { "X-CSRF-TOKEN": token },
+    },
+  );
+  if (!response.ok) {
+    const body = await readErrorBody(response);
+    throw new AuthApiError(
+      response.status,
+      body.code ?? "unknown",
+      body.message,
+    );
+  }
 }

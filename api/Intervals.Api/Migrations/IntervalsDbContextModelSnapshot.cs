@@ -54,11 +54,74 @@ namespace Intervals.Api.Migrations
                     b.Property<DateTimeOffset?>("LastLoginUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("MergedIntoUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("MergedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SecurityStamp")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EmailNormalized");
 
+                    b.HasIndex("MergedIntoUserId");
+
                     b.ToTable("AppUsers", (string)null);
+                });
+
+            modelBuilder.Entity("Intervals.Api.Data.Entities.AuthActionToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConsumedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("EmailNormalized")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTimeOffset>("ExpiresUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("RevokedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Purpose", "TokenHash");
+
+                    b.HasIndex("UserId", "Purpose");
+
+                    b.ToTable("AuthActionTokens", (string)null);
                 });
 
             modelBuilder.Entity("Intervals.Api.Data.Entities.AuthEvent", b =>
@@ -172,6 +235,9 @@ namespace Intervals.Api.Migrations
                     b.Property<bool>("EmailVerified")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTimeOffset?>("EmailVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("FailedAttemptCount")
                         .HasColumnType("integer");
 
@@ -200,6 +266,17 @@ namespace Intervals.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("PasswordCredentials", (string)null);
+                });
+
+            modelBuilder.Entity("Intervals.Api.Data.Entities.AuthActionToken", b =>
+                {
+                    b.HasOne("Intervals.Api.Data.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Intervals.Api.Data.Entities.ExternalLogin", b =>

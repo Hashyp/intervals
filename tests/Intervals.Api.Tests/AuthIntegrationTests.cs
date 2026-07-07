@@ -91,15 +91,22 @@ public sealed class AuthIntegrationTests
 
         var providers = root.GetProperty("providers").EnumerateArray();
         JsonElement? google = null;
+        JsonElement? microsoft = null;
         foreach (var p in providers)
         {
             if (p.GetProperty("id").GetString() == "google")
             {
                 google = p;
             }
+            else if (p.GetProperty("id").GetString() == "microsoft")
+            {
+                microsoft = p;
+            }
         }
         Assert.NotNull(google);
         Assert.True(google!.Value.GetProperty("linked").GetBoolean());
+        Assert.NotNull(microsoft);
+        Assert.False(microsoft!.Value.GetProperty("linked").GetBoolean());
     }
 
     [Fact]

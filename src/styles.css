@@ -1196,6 +1196,7 @@ h2 {
   cursor: pointer;
 }
 .auth-button--google { border-color: var(--accent-deep); }
+.auth-button--microsoft { border-color: var(--accent-deep); }
 .auth-button--x { border-color: var(--line-strong); }
 .auth-button:hover { border-color: var(--accent); }
 .auth-button:disabled { opacity: 0.6; cursor: default; }

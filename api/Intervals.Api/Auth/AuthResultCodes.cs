@@ -11,5 +11,6 @@ public static class AuthResultCodes
     public const string EmailTaken = "email_taken";
     public const string WeakPassword = "weak_password";
     public const string LockedOut = "locked_out";
+    public const string Disabled = "disabled";
     public const string InvalidRequest = "invalid_request";
 }

@@ -1,6 +1,7 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres");
+IResourceBuilder<MailPitContainerResource>? mailpit = null;
 
 if (builder.ExecutionContext.IsRunMode)
 {
@@ -13,6 +14,11 @@ if (builder.ExecutionContext.IsRunMode)
     // Web UI (pgAdmin 4) for browsing local Postgres data. Dev-only so the
     // distributed smoke test doesn't pull the image.
     postgres.WithPgAdmin();
+
+    // Local SMTP capture UI (Mailpit). Dev-only so the distributed smoke test
+    // doesn't pull the image. Verification and password-reset email land here.
+    mailpit = builder.AddMailPit("mailpit")
+        .WithDataVolume("intervals-mailpit-data");
 }
 
 var intervalsDb = postgres.AddDatabase("intervalsdb");
@@ -41,6 +47,8 @@ if (builder.ExecutionContext.IsRunMode)
     api.WithEnvironment(context =>
     {
         context.EnvironmentVariables["Web__BaseUrl"] = web.GetEndpoint("http");
+        context.EnvironmentVariables["Mail__Smtp__Host"] = mailpit!.GetEndpoint("smtp").Host;
+        context.EnvironmentVariables["Mail__Smtp__Port"] = mailpit!.GetEndpoint("smtp").Port;
     });
 
     api.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development");

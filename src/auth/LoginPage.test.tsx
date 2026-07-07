@@ -39,11 +39,18 @@ describe("LoginPage", () => {
     const googleForm = document.querySelector(
       'form[action="/auth/login/google"]',
     );
+    const microsoftForm = document.querySelector(
+      'form[action="/auth/login/microsoft"]',
+    );
     const xForm = document.querySelector('form[action="/auth/login/x"]');
     expect(googleForm).not.toBeNull();
+    expect(microsoftForm).not.toBeNull();
     expect(xForm).not.toBeNull();
     expect(
       screen.getByRole("button", { name: /google/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /continue with microsoft/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /continue with x/i }),

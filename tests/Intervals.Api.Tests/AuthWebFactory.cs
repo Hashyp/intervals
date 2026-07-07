@@ -39,6 +39,8 @@ public sealed class AuthWebFactory : WebApplicationFactory<Program>, IAsyncLifet
         Environment.SetEnvironmentVariable("ConnectionStrings__intervalsdb", ConnectionString);
         Environment.SetEnvironmentVariable("Authentication__Google__ClientId", "test-google-client-id");
         Environment.SetEnvironmentVariable("Authentication__Google__ClientSecret", "test-google-client-secret");
+        Environment.SetEnvironmentVariable("Authentication__Microsoft__ClientId", "test-microsoft-client-id");
+        Environment.SetEnvironmentVariable("Authentication__Microsoft__ClientSecret", "test-microsoft-client-secret");
         Environment.SetEnvironmentVariable("Authentication__X__ClientId", "test-x-client-id");
         Environment.SetEnvironmentVariable("Authentication__X__ClientSecret", "test-x-client-secret");
         Environment.SetEnvironmentVariable("Web__BaseUrl", string.Empty);
