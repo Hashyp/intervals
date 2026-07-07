@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Intervals Social Login Functional Specification</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --ink: #17202a;
+        --muted: #56616f;
+        --line: #d9dee7;
+        --accent: #0f766e;
+        --accent-strong: #115e59;
+        --warn-bg: #fff7ed;
+        --warn-line: #fed7aa;
+        --ok-bg: #ecfdf5;
+        --ok-line: #a7f3d0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 48px 24px 72px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 2.4rem;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        border-bottom: 1px solid var(--line);
+        font-size: 1.45rem;
+        margin-top: 36px;
+        padding-bottom: 10px;
+      }
+
+      h3 {
+        font-size: 1.05rem;
+        margin-top: 22px;
+      }
+
+      p {
+        margin: 12px 0;
+      }
+
+      a {
+        color: var(--accent-strong);
+      }
+
+      table {
+        border-collapse: collapse;
+        margin: 16px 0;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #eef2f7;
+        font-weight: 700;
+      }
+
+      code {
+        background: #eef2f7;
+        border: 1px solid #dde4ee;
+        border-radius: 4px;
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.92em;
+        padding: 1px 5px;
+      }
+
+      ul,
+      ol {
+        padding-left: 24px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .pill {
+        background: #e6fffb;
+        border: 1px solid #99f6e4;
+        border-radius: 999px;
+        color: #134e4a;
+        display: inline-flex;
+        font-size: 0.88rem;
+        font-weight: 700;
+        padding: 4px 10px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 18px;
+      }
+
+      .callout {
+        background: var(--warn-bg);
+        border: 1px solid var(--warn-line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 16px 18px;
+      }
+
+      .success {
+        background: var(--ok-bg);
+        border-color: var(--ok-line);
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      @media (max-width: 720px) {
+        main {
+          padding: 32px 16px 56px;
+        }
+
+        h1 {
+          font-size: 1.85rem;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="pill">Functional specification</span>
+        <h1>Social Login and Auth Gate for Intervals</h1>
+        <div class="meta">
+          <span>Status: Draft v0.1</span>
+          <span>Last reviewed: 2026-07-02</span>
+          <span>Branch: docs/social-login-functional-spec</span>
+        </div>
+      </header>
+
+      <section class="panel success">
+        <h2>Executive Recommendation</h2>
+        <p>
+          Launch with <strong>Google</strong> and <strong>X (x.com)</strong>
+          because they are explicit product requirements. Defer
+          <strong>Apple</strong> to phase 2. Treat
+          <strong>Facebook</strong>, <strong>Microsoft</strong>, and
+          <strong>GitHub</strong> as later optional additions unless user
+          research shows strong demand.
+        </p>
+        <p>
+          The app must not allow anonymous product access. Only the login page,
+          auth start endpoints, auth callbacks, logout completion page, static
+          assets required by login, and explicitly private infrastructure health
+          checks may be reachable before authentication.
+        </p>
+      </section>
+
+      <section>
+        <h2>Goals</h2>
+        <ul>
+          <li>
+            Require a signed-in account before a user can access the Intervals
+            training experience.
+          </li>
+          <li>
+            Provide social login through Google and X at minimum, with a clear
+            path for Apple and optional future providers.
+          </li>
+          <li>
+            Secure the API server-side so every public API endpoint rejects
+            anonymous requests.
+          </li>
+          <li>
+            Create or reuse one internal Intervals user account per person,
+            regardless of which linked provider they use later.
+          </li>
+          <li>
+            Avoid custom OAuth logic in the browser. Provider tokens must be
+            exchanged and stored only by the backend when storage is required.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Non-Goals</h2>
+        <ul>
+          <li>
+            Building paid subscriptions, roles beyond basic authenticated user,
+            or organization/team accounts.
+          </li>
+          <li>
+            Requesting provider permissions to post, read timelines, manage
+            contacts, or access unrelated social data.
+          </li>
+          <li>
+            Implementing email/password signup in the initial social-login
+            release.
+          </li>
+          <li>
+            Migrating local anonymous practice history into a cloud account,
+            except through a later explicit data migration feature.
+          </li>
+          <li>
+            Cloud-synced progress, cross-device practice history, and
+            server-side score storage in the initial authentication release.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Provider Recommendation</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Provider</th>
+              <th>Recommendation</th>
+              <th>Rationale</th>
+              <th>Minimum scopes / data</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Google</td>
+              <td>Required for MVP</td>
+              <td>
+                Broad consumer reach, strong OIDC support, reliable email and
+                profile claims.
+              </td>
+              <td><code>openid</code>, <code>email</code>, <code>profile</code></td>
+              <td>
+                Use server-side authorization code flow. The app user key must
+                use Google's stable subject claim, not email alone.
+              </td>
+            </tr>
+            <tr>
+              <td>X (x.com)</td>
+              <td>Required for MVP</td>
+              <td>
+                Explicit requirement. Useful for users who prefer social handle
+                identity.
+              </td>
+              <td><code>users.read</code>, <code>users.email</code></td>
+              <td>
+                X uses OAuth 2.0 authorization code with PKCE. Treat email as
+                optional until confirmed in the live developer app. The stable X
+                user id is the primary account link.
+              </td>
+            </tr>
+            <tr>
+              <td>Apple</td>
+              <td>Phase 2</td>
+              <td>
+                Strong consumer trust and privacy positioning, but not required
+                for the first authenticated release.
+              </td>
+              <td><code>name</code>, <code>email</code></td>
+              <td>
+                Apple may provide private relay email addresses. The provider
+                subject remains the durable identity.
+              </td>
+            </tr>
+            <tr>
+              <td>Facebook</td>
+              <td>Optional phase 2</td>
+              <td>
+                Large account base, but weaker fit for an ear-training app and
+                more privacy/review friction than Google or Apple.
+              </td>
+              <td><code>public_profile</code>, <code>email</code></td>
+              <td>
+                Add only if analytics, support requests, or target-audience
+                research show demand.
+              </td>
+            </tr>
+            <tr>
+              <td>Microsoft</td>
+              <td>Optional phase 2</td>
+              <td>
+                Useful for education or work accounts. Lower priority for a
+                consumer music practice app unless schools become a target.
+              </td>
+              <td><code>openid</code>, <code>email</code>, <code>profile</code></td>
+              <td>
+                Consider when classroom, school district, or enterprise use
+                becomes a product direction.
+              </td>
+            </tr>
+            <tr>
+              <td>GitHub</td>
+              <td>Defer</td>
+              <td>
+                Excellent for developer tools, but weak fit for the expected
+                Intervals audience.
+              </td>
+              <td><code>read:user</code>, <code>user:email</code></td>
+              <td>
+                Do not include unless the app becomes developer-focused or user
+                demand is proven.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>User Experience</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>Unauthenticated Visit</h3>
+            <ul>
+              <li>
+                Visiting the root URL or any training route while signed out
+                redirects to <code>/login</code>.
+              </li>
+              <li>
+                The app stores the originally requested path as a validated
+                relative <code>returnUrl</code>.
+              </li>
+              <li>
+                No training UI, score data, or API-backed content is displayed
+                before authentication.
+              </li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>Login Page</h3>
+            <ul>
+              <li>
+                Show the Intervals name, a concise sign-in prompt, and provider
+                buttons for Google and X.
+              </li>
+              <li>
+                Keep the layout ready for Apple in phase 2 without showing an
+                inactive Apple button in the MVP.
+              </li>
+              <li>
+                Provider buttons must follow each provider's branding rules.
+              </li>
+              <li>
+                Include links to privacy policy, terms, and support contact.
+              </li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>Successful Login</h3>
+            <ul>
+              <li>
+                First-time users get an internal Intervals account automatically.
+              </li>
+              <li>
+                Returning users resume the requested route or default to the
+                training screen.
+              </li>
+              <li>
+                The header or account menu shows the display name and a logout
+                action.
+              </li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>Failed Login</h3>
+            <ul>
+              <li>
+                Cancelled provider login returns to <code>/login</code> with a
+                neutral message.
+              </li>
+              <li>
+                Provider errors show a retry option and do not expose raw
+                provider exception details.
+              </li>
+              <li>
+                If an email is already attached to another account, the user is
+                guided through account linking after authenticating that account.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Functional Requirements</h2>
+        <h3>Authentication Boundary</h3>
+        <ol>
+          <li>
+            The training experience is available only to authenticated users.
+          </li>
+          <li>
+            The API rejects anonymous requests with <code>401 Unauthorized</code>
+            for every public endpoint, including <code>/api/status</code>.
+          </li>
+          <li>
+            The API returns <code>403 Forbidden</code> when an authenticated user
+            lacks permission for a future protected action.
+          </li>
+          <li>
+            Browser route guards are not the security boundary. Authorization is
+            enforced by the backend.
+          </li>
+          <li>
+            Static assets required for rendering the login page may be public.
+            The authenticated app shell must either be protected by the backend
+            or contain no usable product data until session validation succeeds.
+          </li>
+        </ol>
+
+        <h3>Session</h3>
+        <ol>
+          <li>
+            The backend issues a secure, HTTP-only session cookie after provider
+            callback validation succeeds.
+          </li>
+          <li>
+            Cookies use <code>Secure</code>, <code>HttpOnly</code>, and an
+            appropriate <code>SameSite</code> value that supports OAuth callback
+            redirects.
+          </li>
+          <li>
+            Sessions expire after a configurable idle timeout and absolute
+            lifetime.
+          </li>
+          <li>
+            The login page offers a <code>Remember me</code> option. When
+            selected, the backend issues a longer-lived persistent session for
+            that browser. When not selected, the backend uses the standard
+            session lifetime.
+          </li>
+          <li>
+            Logout invalidates the server session and returns the user to
+            <code>/login</code>.
+          </li>
+          <li>
+            The React app reads session state from <code>GET /api/session</code>
+            instead of decoding provider tokens in the browser.
+          </li>
+        </ol>
+
+        <h3>Account Model</h3>
+        <ol>
+          <li>
+            Each account has an internal immutable user id.
+          </li>
+          <li>
+            Each linked provider stores provider name, provider user id, display
+            name, email when available, email verification status when available,
+            avatar URL when available, first linked timestamp, and last login
+            timestamp.
+          </li>
+          <li>
+            Provider user id plus provider name is the unique login key.
+          </li>
+          <li>
+            Email is used for display and merge guidance, not as the only
+            identity key.
+          </li>
+          <li>
+            Users can link another provider from account settings after signing
+            in.
+          </li>
+          <li>
+            Users cannot unlink their only active login provider unless another
+            login method has already been linked.
+          </li>
+        </ol>
+
+        <h3>Provider Flow</h3>
+        <ol>
+          <li>
+            <code>POST /auth/login/{provider}</code> starts login for a known
+            enabled provider.
+          </li>
+          <li>
+            The backend generates and validates <code>state</code> for CSRF
+            protection.
+          </li>
+          <li>
+            Flows that support PKCE use PKCE.
+          </li>
+          <li>
+            The backend validates callback parameters, exchanges the
+            authorization code, fetches the minimum user profile, and creates or
+            updates the provider link.
+          </li>
+          <li>
+            Requested scopes are limited to identity and email. Social posting,
+            timelines, contacts, and write scopes are disallowed.
+          </li>
+        </ol>
+
+        <h3>API Contract</h3>
+        <ol>
+          <li>
+            <code>GET /api/session</code> returns the current user summary for
+            authenticated users.
+          </li>
+          <li>
+            <code>GET /api/session</code> returns <code>401</code> for
+            anonymous users.
+          </li>
+          <li>
+            Existing endpoints, starting with <code>/api/status</code>, require
+            authorization.
+          </li>
+          <li>
+            API errors use a consistent JSON shape with code, message, and
+            correlation id.
+          </li>
+          <li>
+            Cross-origin requests with credentials are allowed only from
+            approved app origins.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Security and Privacy Requirements</h2>
+        <ul>
+          <li>
+            Use maintained authentication libraries or platform middleware for
+            OAuth and OIDC.
+          </li>
+          <li>
+            Store client secrets only in local user secrets, environment
+            variables, or a production secret store. Never commit secrets to the
+            repository.
+          </li>
+          <li>
+            Do not store provider access tokens unless a concrete product
+            feature requires calling provider APIs after login.
+          </li>
+          <li>
+            If provider tokens are stored later, encrypt them at rest and record
+            purpose, scope, expiration, and revocation behavior.
+          </li>
+          <li>
+            Protect state-changing API calls with CSRF defenses when cookie
+            authentication is used.
+          </li>
+          <li>
+            Log auth events such as login success, login failure, logout,
+            provider link, and provider unlink without logging raw tokens or
+            secrets.
+          </li>
+          <li>
+            Include rate limiting for login start, callback failure, and session
+            endpoints.
+          </li>
+          <li>
+            Collect only profile data required for account display and support.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Current Repo Fit</h2>
+        <p>
+          The current project has a Vite/React frontend and a .NET minimal API.
+          The recommended implementation posture is server-owned authentication:
+          the API handles provider redirects and session cookies, while React
+          treats <code>/api/session</code> as the source of truth.
+        </p>
+        <ul>
+          <li>
+            In ASP.NET Core, configure a fallback authorization policy so new
+            endpoints require authentication by default.
+          </li>
+          <li>
+            Mark only auth endpoints and private infrastructure endpoints with
+            explicit allow-anonymous behavior.
+          </li>
+          <li>
+            Apply <code>RequireAuthorization()</code> to existing minimal API
+            routes during migration.
+          </li>
+          <li>
+            Provider credentials should be read from .NET user secrets during
+            development and initial validation. The Aspire AppHost must not
+            hardcode them. Before public production launch, move the same
+            values to the deployment platform's managed secret store.
+          </li>
+        </ul>
+      </section>
+
+      <section class="callout">
+        <h2>Health Check Decision</h2>
+        <p>
+          The user requirement says no anonymous API access. Production health
+          checks sometimes need unauthenticated probing by a load balancer. If
+          this app needs that, the health endpoint must be private to the
+          platform network or protected by platform-level authentication. It
+          should not be a public anonymous endpoint.
+        </p>
+      </section>
+
+      <section>
+        <h2>Acceptance Criteria</h2>
+        <ol>
+          <li>
+            A signed-out visitor to <code>/</code> sees the login page and
+            cannot access the training UI.
+          </li>
+          <li>
+            Login buttons exist for Google and X, and each starts the correct
+            provider flow.
+          </li>
+          <li>
+            A successful first-time provider login creates one internal user
+            account and signs the user in.
+          </li>
+          <li>
+            A successful returning provider login signs in to the same internal
+            account.
+          </li>
+          <li>
+            A signed-out request to <code>/api/status</code> returns
+            <code>401</code>.
+          </li>
+          <li>
+            A signed-in request to <code>/api/status</code> succeeds.
+          </li>
+          <li>
+            Logout clears the session and prevents subsequent API access until
+            the user signs in again.
+          </li>
+          <li>
+            Provider access tokens and secrets never appear in browser storage,
+            logs, or committed files.
+          </li>
+          <li>
+            Login failure, provider cancellation, and provider outage states
+            show user-safe messages on the login page.
+          </li>
+          <li>
+            Automated tests cover anonymous rejection, authenticated API access,
+            login callback success, callback state mismatch, and logout.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Testing Decision</h2>
+        <ul>
+          <li>
+            API integration tests should use
+            <code>WebApplicationFactory</code> with test authentication schemes
+            and <code>Testcontainers.PostgreSql</code> for a disposable PostgreSQL
+            database. This is the default approach for testing auth
+            persistence, cookie behavior, logout, and anonymous API rejection
+            against the same database engine used locally.
+          </li>
+          <li>
+            Aspire's <code>Aspire.Hosting.Testing</code> package is appropriate
+            for full distributed-app tests that launch the AppHost, API, web
+            frontend, and PostgreSQL together.
+          </li>
+          <li>
+            Decision: convert the current file-based <code>apphost.cs</code> to
+            a project-based AppHost as part of the auth implementation plan so
+            Aspire distributed-app tests can reference it. This adds full-system
+            coverage, but it does not replace the more focused
+            <code>Testcontainers.PostgreSql</code> API integration tests.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Resolved Product Decisions</h2>
+        <ol>
+          <li>
+            Apple is not included in the first authenticated release. It is
+            deferred to phase 2.
+          </li>
+          <li>
+            No email magic-link fallback is required for the initial release.
+            Users must sign in with an enabled social provider.
+          </li>
+          <li>
+            Practice progress stays local for this authentication release.
+            Login secures access and identifies the user, but cross-device
+            progress sync, server-side score storage, and account-based practice
+            history are separate future features.
+          </li>
+          <li>
+            The login page includes a <code>Remember me</code> option. Users who
+            select it get a longer-lived persistent session; users who do not
+            select it get the standard session lifetime.
+          </li>
+          <li>
+            Secret setup for this phase: use .NET user secrets for Google and X
+            client ids and client secrets during development and initial
+            validation. Register localhost backend callback URLs for
+            development. Before a public production launch, move those same
+            values to the deployment platform's managed secret store and
+            register provider callback URLs under the final production origin,
+            for example <code>/auth/callback/google</code> and
+            <code>/auth/callback/x</code>.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Reference Links</h2>
+        <ul>
+          <li>
+            <a href="https://developers.google.com/identity/openid-connect/openid-connect"
+              >Google OpenID Connect documentation</a
+            >
+          </li>
+          <li>
+            <a href="https://docs.x.com/fundamentals/authentication/oauth-2-0/authorization-code"
+              >X OAuth 2.0 authorization code with PKCE documentation</a
+            >
+          </li>
+          <li>
+            <a href="https://learn.microsoft.com/en-us/aspnet/core/security/authentication/social/"
+              >ASP.NET Core external provider authentication documentation</a
+            >
+          </li>
+          <li>
+            <a href="https://developer.apple.com/sign-in-with-apple/"
+              >Apple Sign in with Apple documentation</a
+            >
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
