@@ -9,6 +9,10 @@ if (builder.ExecutionContext.IsRunMode)
     postgres
         .WithDataVolume("intervals-postgres-data")
         .WithLifetime(ContainerLifetime.Persistent);
+
+    // Web UI (pgAdmin 4) for browsing local Postgres data. Dev-only so the
+    // distributed smoke test doesn't pull the image.
+    postgres.WithPgAdmin();
 }
 
 var intervalsDb = postgres.AddDatabase("intervalsdb");
