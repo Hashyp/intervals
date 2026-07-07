@@ -15,11 +15,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   email_verified: "Your email has been verified. You can sign in now.",
   verification_failed:
     "We couldn't verify that link. It may have expired or already been used.",
+  disabled: "This account has been disabled.",
 };
 
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: "Incorrect email or password.",
   locked_out: "Too many attempts. Please try again in a few minutes.",
+  disabled: "This account has been disabled.",
 };
 
 const REGISTER_ERROR_MESSAGES: Record<string, string> = {

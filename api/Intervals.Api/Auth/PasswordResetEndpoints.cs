@@ -1,8 +1,11 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Intervals.Api.Data;
+using Intervals.Api.Data.Entities;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Intervals.Api.Auth;
@@ -23,6 +26,7 @@ public static class PasswordResetEndpoints
             HttpContext context,
             IAntiforgery antiforgery,
             IPasswordResetService resets,
+            IntervalsDbContext db,
             CancellationToken cancellationToken) =>
         {
             try
@@ -46,10 +50,31 @@ public static class PasswordResetEndpoints
                     context.GetCorrelationId()));
             }
 
+            var normalized = NormalizeEmail(body.Email);
+            if (normalized is not null)
+            {
+                var credential = await db.PasswordCredentials
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.EmailNormalized == normalized, cancellationToken);
+
+                if (credential is not null)
+                {
+                    db.AuthEvents.Add(new AuthEvent
+                    {
+                        UserId = credential.UserId,
+                        EventType = AuthEventTypes.PasswordResetRequested,
+                        OccurredUtc = DateTimeOffset.UtcNow,
+                        Success = true,
+                        CorrelationId = context.GetCorrelationId(),
+                    });
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+            }
+
             await resets.RequestResetAsync(body.Email, context.GetCorrelationId(), cancellationToken);
 
             return Results.Ok(new { ok = true });
-        }).AllowAnonymous().RateLimit();
+        }).AllowAnonymous().RequireRateLimiting("password-reset");
 
         group.MapPost("/reset", async (
             HttpContext context,
@@ -108,6 +133,24 @@ public static class PasswordResetEndpoints
         }).AllowAnonymous().RateLimit();
 
         return app;
+    }
+
+    private const int MaxEmailLength = 320;
+
+    private static string? NormalizeEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var trimmed = email.Trim();
+        if (trimmed.Length > MaxEmailLength)
+        {
+            return null;
+        }
+
+        return trimmed.ToUpperInvariant();
     }
 }
 

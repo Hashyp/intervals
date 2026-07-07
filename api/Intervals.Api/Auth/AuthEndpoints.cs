@@ -21,6 +21,8 @@ namespace Intervals.Api.Auth;
 
 public static class AuthEndpoints
 {
+    public const string SecurityStampClaimType = "intervals:security_stamp";
+
     public static WebApplication MapAuthEndpoints(this WebApplication app)
     {
         var webBaseUrl = app.Configuration["Web:BaseUrl"] ?? string.Empty;
@@ -121,6 +123,9 @@ public static class AuthEndpoints
                 AuthResultCodes.LockedOut => Results.Json(
                     new ApiError(AuthResultCodes.LockedOut, "Account is locked.", correlationId),
                     statusCode: StatusCodes.Status423Locked),
+                AuthResultCodes.Disabled => Results.Json(
+                    new ApiError(AuthResultCodes.Disabled, "This account is disabled.", correlationId),
+                    statusCode: StatusCodes.Status403Forbidden),
                 _ => Results.BadRequest(new ApiError(
                     AuthResultCodes.InvalidRequest,
                     "Login failed.",
@@ -240,6 +245,12 @@ public static class AuthEndpoints
             var correlationId = context.GetCorrelationId();
             var result = await accounts.LoginAsync(profile, correlationId, cancellationToken);
 
+            if (result.User.DisabledUtc is not null)
+            {
+                await context.SignOutAsync(AuthExtensions.ExternalCookieScheme);
+                return Results.Redirect(AuthRedirect.Build(webBaseUrl, loginPath, AuthResultCodes.Disabled));
+            }
+
             var rememberMe = GetRememberMe(authenticateResult.Properties);
             var returnUrl = GetReturnUrl(authenticateResult.Properties);
 
@@ -349,6 +360,8 @@ public static class AuthEndpoints
         {
             identity.AddClaim(new Claim(ClaimTypes.Email, user.Email));
         }
+
+        identity.AddClaim(new Claim(SecurityStampClaimType, user.SecurityStamp ?? string.Empty));
 
         return new ClaimsPrincipal(identity);
     }

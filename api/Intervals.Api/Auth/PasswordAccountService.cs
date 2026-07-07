@@ -131,6 +131,19 @@ public sealed class PasswordAccountService(
             return new PasswordLoginResult(false, null, AuthResultCodes.InvalidCredentials);
         }
 
+        if (credential.User is { DisabledUtc: not null })
+        {
+            await RecordAsync(
+                AuthEventTypes.LoginFailure,
+                credential.UserId,
+                AuthProviderNames.Password,
+                success: false,
+                correlationId,
+                cancellationToken);
+
+            return new PasswordLoginResult(false, null, AuthResultCodes.Disabled);
+        }
+
         if (credential.LockoutUntilUtc is { } lockout && lockout > DateTimeOffset.UtcNow)
         {
             await RecordAsync(

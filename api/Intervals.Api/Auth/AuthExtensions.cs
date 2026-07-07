@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -11,9 +12,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Intervals.Api.Data;
 using Intervals.Api.Data.Entities;
 
 namespace Intervals.Api.Auth;
@@ -77,6 +81,68 @@ public static class AuthExtensions
 
                     context.Response.Redirect(context.RedirectUri);
                     return Task.CompletedTask;
+                },
+                OnValidatePrincipal = async context =>
+                {
+                    var principal = context.Principal;
+                    if (principal is null)
+                    {
+                        return;
+                    }
+
+                    var userIdClaim = principal.FindFirst(CurrentUser.UserIdClaimType)?.Value;
+                    if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                    {
+                        return;
+                    }
+
+                    var stampClaim = principal.FindFirst(AuthEndpoints.SecurityStampClaimType)?.Value;
+                    if (stampClaim is null)
+                    {
+                        // Principals without a security-stamp claim (e.g. the test-login endpoint)
+                        // are not subject to stamp-based invalidation.
+                        return;
+                    }
+
+                    var cache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+                    var cacheKey = $"intervals:security_stamp:{userId}";
+
+                    try
+                    {
+                        if (!cache.TryGetValue(cacheKey, out (bool Exists, string? Stamp) cached))
+                        {
+                            var scopeFactory = context.HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
+                            using var scope = scopeFactory.CreateScope();
+                            var db = scope.ServiceProvider.GetRequiredService<IntervalsDbContext>();
+                            var record = await db.AppUsers
+                                .AsNoTracking()
+                                .Where(u => u.Id == userId)
+                                .Select(u => new { u.SecurityStamp })
+                                .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+                            cached = record is null ? (false, (string?)null) : (true, record.SecurityStamp);
+                            cache.Set(cacheKey, cached, TimeSpan.FromMinutes(1));
+                        }
+
+                        if (!cached.Exists)
+                        {
+                            context.RejectPrincipal();
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(cached.Stamp) || string.IsNullOrEmpty(stampClaim))
+                        {
+                            return;
+                        }
+
+                        if (!string.Equals(cached.Stamp, stampClaim, StringComparison.Ordinal))
+                        {
+                            context.RejectPrincipal();
+                        }
+                    }
+                    catch
+                    {
+                        // Fail open: a DB error must not log users out.
+                    }
                 },
             };
         });
@@ -194,6 +260,7 @@ public static class AuthExtensions
         builder.Services.AddScoped<IPasswordAccountService, PasswordAccountService>();
         builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.PasswordHasher<AppUser>>();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddMemoryCache();
 
         builder.Services.AddAuthorization(options =>
         {
@@ -217,6 +284,20 @@ public static class AuthExtensions
             options.AddFixedWindowLimiter(RateLimitPolicy, window =>
             {
                 window.PermitLimit = 60;
+                window.Window = TimeSpan.FromMinutes(1);
+                window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                window.QueueLimit = 0;
+            });
+            options.AddFixedWindowLimiter("verification", window =>
+            {
+                window.PermitLimit = 5;
+                window.Window = TimeSpan.FromMinutes(1);
+                window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                window.QueueLimit = 0;
+            });
+            options.AddFixedWindowLimiter("password-reset", window =>
+            {
+                window.PermitLimit = 5;
                 window.Window = TimeSpan.FromMinutes(1);
                 window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
                 window.QueueLimit = 0;

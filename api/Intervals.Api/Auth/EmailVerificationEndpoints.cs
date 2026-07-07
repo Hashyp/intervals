@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Intervals.Api.Data;
+using Intervals.Api.Data.Entities;
 using Intervals.Api.Email;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
@@ -72,6 +73,16 @@ public static class EmailVerificationEndpoints
                 var (subject, html, text) = EmailTemplates.EmailVerification(credential.Email, verificationLink);
 
                 await emailSender.SendEmailAsync(credential.Email, subject, html, text, cancellationToken);
+
+                db.AuthEvents.Add(new AuthEvent
+                {
+                    UserId = userId,
+                    EventType = AuthEventTypes.EmailVerificationSent,
+                    OccurredUtc = DateTimeOffset.UtcNow,
+                    Success = true,
+                    CorrelationId = context.GetCorrelationId(),
+                });
+                await db.SaveChangesAsync(cancellationToken);
             }
             catch
             {
@@ -79,7 +90,7 @@ public static class EmailVerificationEndpoints
             }
 
             return Results.Ok(new { ok = true });
-        }).RequireAuthorization().RateLimit();
+        }).RequireAuthorization().RequireRateLimiting("verification");
 
         group.MapGet("/confirm", async (
             HttpContext context,
@@ -98,6 +109,15 @@ public static class EmailVerificationEndpoints
 
             if (consumed is null)
             {
+                db.AuthEvents.Add(new AuthEvent
+                {
+                    UserId = null,
+                    EventType = AuthEventTypes.EmailVerified,
+                    OccurredUtc = DateTimeOffset.UtcNow,
+                    Success = false,
+                    CorrelationId = context.GetCorrelationId(),
+                });
+                await db.SaveChangesAsync(cancellationToken);
                 return Results.Redirect(AuthRedirect.Build(webBaseUrl, loginPath, "verification_failed"));
             }
 
@@ -108,8 +128,17 @@ public static class EmailVerificationEndpoints
             {
                 credential.EmailVerified = true;
                 credential.EmailVerifiedAtUtc = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(cancellationToken);
             }
+
+            db.AuthEvents.Add(new AuthEvent
+            {
+                UserId = consumed.UserId,
+                EventType = AuthEventTypes.EmailVerified,
+                OccurredUtc = DateTimeOffset.UtcNow,
+                Success = true,
+                CorrelationId = context.GetCorrelationId(),
+            });
+            await db.SaveChangesAsync(cancellationToken);
 
             return Results.Redirect(AuthRedirect.Build(webBaseUrl, loginPath, "email_verified"));
         }).AllowAnonymous().RateLimit();
