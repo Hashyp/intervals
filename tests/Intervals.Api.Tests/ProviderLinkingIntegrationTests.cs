@@ -306,6 +306,44 @@ public sealed class ProviderLinkingIntegrationTests
     }
 
     [Fact]
+    public async Task MergeAsync_rejectsForgedPendingMergeCookie()
+    {
+        await _factory.ResetDatabaseAsync();
+        var primary = NewUser("Primary", "primary@example.com", securityStamp: "primary-stamp");
+        var secondary = NewUser("Secondary", "secondary@example.com");
+        secondary.ExternalLogins.Add(NewExternal(secondary.Id, "google", "google-sec", "secondary@example.com"));
+        await SeedAsync(primary, secondary);
+
+        var (scope, _, merge, db) = Resolve(_factory);
+        await using var _db = db;
+        using var _ = scope;
+
+        var context = NewHttpContext();
+        // A hand-crafted, unsigned cookie value a client could set itself. Because the
+        // pending-merge cookie is now data-protection-signed, this must be rejected.
+        context.Request.Headers.Cookie =
+            $"{AccountMergeService.CookieName}={primary.Id}:{secondary.Id}:google";
+
+        var ok = await merge.MergeAsync(primary.Id, context, correlationId: null);
+        Assert.False(ok);
+
+        // No merge occurred: the secondary account is untouched and keeps its external login.
+        var refreshedSecondary = await db.AppUsers.AsNoTracking().FirstAsync(u => u.Id == secondary.Id);
+        Assert.Null(refreshedSecondary.MergedIntoUserId);
+        Assert.Null(refreshedSecondary.DisabledUtc);
+
+        var external = await db.ExternalLogins.AsNoTracking()
+            .FirstAsync(e => e.Provider == "google" && e.ProviderUserId == "google-sec");
+        Assert.Equal(secondary.Id, external.UserId);
+
+        var refreshedPrimary = await db.AppUsers.AsNoTracking().FirstAsync(u => u.Id == primary.Id);
+        Assert.Equal("primary-stamp", refreshedPrimary.SecurityStamp);
+
+        var pending = await merge.GetPendingMergeAsync(primary.Id, context);
+        Assert.Null(pending);
+    }
+
+    [Fact]
     public async Task Complete_endpoint_without_external_cookie_redirects_to_account_settings()
     {
         await _factory.ResetDatabaseAsync();

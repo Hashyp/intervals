@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Intervals.Api.Data;
 using Intervals.Api.Data.Entities;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -12,12 +13,14 @@ namespace Intervals.Api.Auth;
 
 public sealed class AccountMergeService(
     IntervalsDbContext db,
+    IDataProtectionProvider dataProtection,
     ILogger<AccountMergeService> logger) : IAccountMergeService
 {
     public const string CookieName = "Intervals.PendingMerge";
     public const string MergedEventType = "account_merged";
     public const string MergedSecondaryEventType = "account_merged_secondary";
     private static readonly TimeSpan PendingLifetime = TimeSpan.FromMinutes(10);
+    private readonly IDataProtector _protector = dataProtection.CreateProtector("Intervals.AccountMerge.PendingMerge");
 
     public async Task<PendingMergeDetail?> GetPendingMergeAsync(
         Guid primaryUserId,
@@ -140,8 +143,9 @@ public sealed class AccountMergeService(
 
     public void SetPendingMerge(HttpContext httpContext, Guid primaryUserId, Guid secondaryUserId, string provider)
     {
-        var value = $"{primaryUserId}:{secondaryUserId}:{provider}";
-        httpContext.Response.Cookies.Append(CookieName, value, new CookieOptions
+        var payload = $"{primaryUserId}:{secondaryUserId}:{provider}";
+        var protectedValue = _protector.Protect(payload);
+        httpContext.Response.Cookies.Append(CookieName, protectedValue, new CookieOptions
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Lax,
@@ -155,7 +159,7 @@ public sealed class AccountMergeService(
         httpContext.Response.Cookies.Delete(CookieName);
     }
 
-    private static (Guid? Primary, Guid? Secondary, string? Provider) ReadPendingMerge(HttpContext httpContext)
+    private (Guid? Primary, Guid? Secondary, string? Provider) ReadPendingMerge(HttpContext httpContext)
     {
         var raw = httpContext.Request.Cookies[CookieName];
         if (string.IsNullOrWhiteSpace(raw))
@@ -163,7 +167,20 @@ public sealed class AccountMergeService(
             return (null, null, null);
         }
 
-        var segments = raw.Split(':');
+        // The pending-merge cookie is client-settable, so it must be authenticated:
+        // an attacker cannot forge a primary:secondary:provider payload without the
+        // data-protection key. Tampered or unsigned values are treated as absent.
+        string payload;
+        try
+        {
+            payload = _protector.Unprotect(raw);
+        }
+        catch
+        {
+            return (null, null, null);
+        }
+
+        var segments = payload.Split(':');
         if (segments.Length != 3)
         {
             return (null, null, null);

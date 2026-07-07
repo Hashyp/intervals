@@ -82,6 +82,31 @@ public sealed class PasswordResetService(
             return new PasswordResetResult(false, AuthResultCodes.InvalidRequest);
         }
 
+        // Validate the token (non-consuming) first so an invalid/expired link is rejected
+        // before any password work, then validate the new password WITHOUT consuming the
+        // token — a weak password must not burn the one-time emailed link.
+        var validated = await tokens.ValidateAsync(
+            AuthActionTokenPurpose.PasswordReset,
+            rawToken,
+            cancellationToken);
+
+        if (validated is null)
+        {
+            return new PasswordResetResult(false, AuthResultCodes.InvalidRequest);
+        }
+
+        if (!passwordPolicy.IsValid(newPassword, out _))
+        {
+            await RecordAsync(
+                PasswordResetEventType,
+                validated.UserId,
+                AuthProviderNames.Password,
+                success: false,
+                correlationId,
+                cancellationToken);
+            return new PasswordResetResult(false, AuthResultCodes.WeakPassword);
+        }
+
         var consumed = await tokens.ConsumeAsync(
             AuthActionTokenPurpose.PasswordReset,
             rawToken,
@@ -99,18 +124,6 @@ public sealed class PasswordResetService(
         if (credential is null || credential.User is null)
         {
             return new PasswordResetResult(false, AuthResultCodes.InvalidRequest);
-        }
-
-        if (!passwordPolicy.IsValid(newPassword, out _))
-        {
-            await RecordAsync(
-                PasswordResetEventType,
-                consumed.UserId,
-                AuthProviderNames.Password,
-                success: false,
-                correlationId,
-                cancellationToken);
-            return new PasswordResetResult(false, AuthResultCodes.WeakPassword);
         }
 
         var user = credential.User;

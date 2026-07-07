@@ -96,20 +96,12 @@ public static class AuthExtensions
                         return;
                     }
 
-                    var stampClaim = principal.FindFirst(AuthEndpoints.SecurityStampClaimType)?.Value;
-                    if (stampClaim is null)
-                    {
-                        // Principals without a security-stamp claim (e.g. the test-login endpoint)
-                        // are not subject to stamp-based invalidation.
-                        return;
-                    }
-
                     var cache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
-                    var cacheKey = $"intervals:security_stamp:{userId}";
+                    var cacheKey = SecurityStampCacheKey(userId);
 
                     try
                     {
-                        if (!cache.TryGetValue(cacheKey, out (bool Exists, string? Stamp) cached))
+                        if (!cache.TryGetValue(cacheKey, out SecurityStampCacheEntry cached))
                         {
                             var scopeFactory = context.HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
                             using var scope = scopeFactory.CreateScope();
@@ -117,24 +109,42 @@ public static class AuthExtensions
                             var record = await db.AppUsers
                                 .AsNoTracking()
                                 .Where(u => u.Id == userId)
-                                .Select(u => new { u.SecurityStamp })
+                                .Select(u => new { u.SecurityStamp, u.DisabledUtc })
                                 .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
-                            cached = record is null ? (false, (string?)null) : (true, record.SecurityStamp);
+                            cached = record is null
+                                ? SecurityStampCacheEntry.Missing
+                                : new SecurityStampCacheEntry(true, record.SecurityStamp, record.DisabledUtc);
                             cache.Set(cacheKey, cached, TimeSpan.FromMinutes(1));
                         }
 
-                        if (!cached.Exists)
+                        if (!cached.Exists || cached.DisabledUtc is not null)
                         {
+                            // Deleted or disabled (including merged-secondary) accounts must not
+                            // keep using an existing cookie, even before the stamp is checked.
                             context.RejectPrincipal();
                             return;
                         }
 
-                        if (string.IsNullOrEmpty(cached.Stamp) || string.IsNullOrEmpty(stampClaim))
+                        var stampClaim = principal.FindFirst(AuthEndpoints.SecurityStampClaimType)?.Value;
+                        if (stampClaim is null)
                         {
+                            // Principals without a security-stamp claim (e.g. the test-login
+                            // endpoint) skip stamp enforcement; the existence/disabled checks
+                            // above still apply.
                             return;
                         }
 
-                        if (!string.Equals(cached.Stamp, stampClaim, StringComparison.Ordinal))
+                        if (string.IsNullOrEmpty(cached.Stamp))
+                        {
+                            // The user has never had a security stamp; nothing to invalidate yet.
+                            return;
+                        }
+
+                        // Once a non-empty DB stamp exists, an empty or differing cookie claim
+                        // means the cookie predates the stamp-rotating event (password reset,
+                        // change, or merge) and must be treated as stale.
+                        if (string.IsNullOrEmpty(stampClaim)
+                            || !string.Equals(cached.Stamp, stampClaim, StringComparison.Ordinal))
                         {
                             context.RejectPrincipal();
                         }
@@ -326,6 +336,13 @@ public static class AuthExtensions
 
     public static IEndpointConventionBuilder RateLimit(this IEndpointConventionBuilder builder) =>
         builder.WithMetadata(new EnableRateLimitingAttribute(RateLimitPolicy));
+
+    public static string SecurityStampCacheKey(Guid userId) => $"intervals:security_stamp:{userId}";
+
+    internal sealed record SecurityStampCacheEntry(bool Exists, string? Stamp, DateTimeOffset? DisabledUtc)
+    {
+        public static SecurityStampCacheEntry Missing { get; } = new(false, null, null);
+    }
 
     private static bool IsApiRequest(HttpRequest request) => request.Path.StartsWithSegments("/api");
 

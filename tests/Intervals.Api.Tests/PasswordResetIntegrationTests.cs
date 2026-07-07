@@ -324,6 +324,32 @@ public sealed class PasswordResetIntegrationTests
     }
 
     [Fact]
+    public async Task Reset_weakPasswordDoesNotConsumeToken()
+    {
+        await _factory.ResetDatabaseAsync();
+        var (client, sender) = CreateClient();
+
+        var email = UniqueEmail();
+        await RegisterAsync(client, email);
+
+        await RequestResetAsync(client, email);
+        var resetToken = ExtractResetToken(sender.SentEmails);
+
+        var weak = await ResetAsync(client, resetToken, "short");
+        Assert.Equal(HttpStatusCode.BadRequest, weak.StatusCode);
+        using var weakDoc = JsonDocument.Parse(await weak.Content.ReadAsStringAsync());
+        Assert.Equal(AuthResultCodes.WeakPassword, weakDoc.RootElement.GetProperty("code").GetString());
+
+        // The same reset link must still work with a valid password — a weak-password
+        // attempt must not have burned the one-time token.
+        var ok = await ResetAsync(client, resetToken, ResetPassword);
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+
+        var login = await LoginAsync(client, email, ResetPassword);
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+    }
+
+    [Fact]
     public async Task Reset_invalidTokenFails()
     {
         await _factory.ResetDatabaseAsync();
