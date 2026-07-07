@@ -1198,6 +1198,47 @@ h2 {
 .auth-button--google { border-color: var(--accent-deep); }
 .auth-button--x { border-color: var(--line-strong); }
 .auth-button:hover { border-color: var(--accent); }
+.auth-button:disabled { opacity: 0.6; cursor: default; }
+.auth-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 14px 0;
+  border: none;
+}
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.auth-field label {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.auth-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+}
+.auth-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.auth-toggle { margin: 10px 0 0; font-size: 0.9rem; }
+.auth-toggle__button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  padding: 0;
+}
 .auth-links {
   display: flex;
   gap: 14px;

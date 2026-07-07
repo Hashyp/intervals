@@ -9,6 +9,7 @@ const { signOut, session } = vi.hoisted(() => ({
       displayName: "Avery",
       email: null,
       avatarUrl: null,
+      emailVerified: true,
     },
     providers: [],
   },

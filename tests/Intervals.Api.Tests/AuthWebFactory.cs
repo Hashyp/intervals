@@ -52,7 +52,7 @@ public sealed class AuthWebFactory : WebApplicationFactory<Program>, IAsyncLifet
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IntervalsDbContext>();
         await db.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "ExternalLogins", "AuthEvents", "AppUsers" RESTART IDENTITY CASCADE;""");
+            """TRUNCATE TABLE "PasswordCredentials", "ExternalLogins", "AuthEvents", "AppUsers" RESTART IDENTITY CASCADE;""");
     }
 
     public async Task SeedUserAsync(AppUser user)

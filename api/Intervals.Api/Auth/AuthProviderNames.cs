@@ -6,6 +6,7 @@ public static class AuthProviderNames
 {
     public const string Google = "google";
     public const string X = "x";
+    public const string Password = "password";
     public const string GoogleScheme = "Google";
     public const string XScheme = "X";
 

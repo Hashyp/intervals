@@ -6,4 +6,5 @@ public static class AuthEventTypes
     public const string LoginSuccess = "login_success";
     public const string LoginFailure = "login_failure";
     public const string Logout = "logout";
+    public const string RegisterSuccess = "register_success";
 }

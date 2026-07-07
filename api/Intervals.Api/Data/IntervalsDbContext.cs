@@ -12,6 +12,7 @@ public sealed class IntervalsDbContext : DbContext
 
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+    public DbSet<PasswordCredential> PasswordCredentials => Set<PasswordCredential>();
     public DbSet<AuthEvent> AuthEvents => Set<AuthEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -41,6 +42,21 @@ public sealed class IntervalsDbContext : DbContext
                 .HasOne(e => e.User)
                 .WithMany(u => u.ExternalLogins)
                 .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PasswordCredential>(entity =>
+        {
+            entity.ToTable("PasswordCredentials");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(320);
+            entity.Property(e => e.EmailNormalized).IsRequired().HasMaxLength(320);
+            entity.Property(e => e.PasswordHash).IsRequired();
+            entity.HasIndex(e => e.EmailNormalized).IsUnique();
+            entity
+                .HasOne(e => e.User)
+                .WithOne(u => u.PasswordCredential)
+                .HasForeignKey<PasswordCredential>(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

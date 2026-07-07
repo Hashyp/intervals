@@ -94,7 +94,10 @@ public sealed class AccountService(IntervalsDbContext db, ILogger<AccountService
     }
 
     public Task<AppUser?> GetAsync(Guid userId, CancellationToken cancellationToken = default) =>
-        db.AppUsers.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        db.AppUsers
+            .Include(u => u.PasswordCredential)
+            .Include(u => u.ExternalLogins)
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
     public async Task<IReadOnlyList<string>> GetLinkedProvidersAsync(
         Guid userId,

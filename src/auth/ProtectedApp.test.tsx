@@ -42,6 +42,7 @@ describe("ProtectedApp", () => {
         displayName: "Avery",
         email: "a@x.com",
         avatarUrl: null,
+        emailVerified: true,
       },
       providers: [{ id: "google", label: "Google", linked: true }],
     });

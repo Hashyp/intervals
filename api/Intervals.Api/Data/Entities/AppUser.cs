@@ -12,4 +12,6 @@ public sealed class AppUser
     public DateTimeOffset? DisabledUtc { get; set; }
 
     public List<ExternalLogin> ExternalLogins { get; set; } = new();
+
+    public PasswordCredential? PasswordCredential { get; set; }
 }

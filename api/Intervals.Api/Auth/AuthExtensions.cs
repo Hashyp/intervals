@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Intervals.Api.Data.Entities;
 
 namespace Intervals.Api.Auth;
 
@@ -159,6 +160,9 @@ public static class AuthExtensions
 
         builder.Services.AddSingleton<IExternalProfileBuilder, ExternalProfileBuilder>();
         builder.Services.AddScoped<IAccountService, AccountService>();
+        builder.Services.AddSingleton<PasswordPolicy>();
+        builder.Services.AddScoped<IPasswordAccountService, PasswordAccountService>();
+        builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.PasswordHasher<AppUser>>();
         builder.Services.AddHttpContextAccessor();
 
         builder.Services.AddAuthorization(options =>

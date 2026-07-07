@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Intervals.Api.Data.Entities;
 
 namespace Intervals.Api.Auth;
 
@@ -59,6 +60,140 @@ public static class AuthEndpoints
             await context.ChallengeAsync(scheme, properties);
         }).AllowAnonymous().RateLimit();
 
+        group.MapPost("/login/password", async (
+            HttpContext context,
+            IAntiforgery antiforgery,
+            IPasswordAccountService passwordAccounts,
+            IOptions<AuthOptions> authOptions,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                await antiforgery.ValidateRequestAsync(context);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                return Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Antiforgery validation failed.",
+                    context.GetCorrelationId()));
+            }
+
+            var request = await context.Request.ReadFromJsonAsync<PasswordLoginRequest>(cancellationToken);
+            if (request is null
+                || string.IsNullOrWhiteSpace(request.Email)
+                || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Email and password are required.",
+                    context.GetCorrelationId()));
+            }
+
+            var correlationId = context.GetCorrelationId();
+            var result = await passwordAccounts.AuthenticateAsync(
+                request.Email,
+                request.Password,
+                correlationId,
+                cancellationToken);
+
+            if (result.Success && result.User is not null)
+            {
+                var principal = BuildAppPrincipal(result.User);
+                var rememberMe = request.RememberMe;
+                var properties = new AuthenticationProperties
+                {
+                    IsPersistent = rememberMe,
+                    ExpiresUtc = DateTimeOffset.UtcNow.Add(
+                        rememberMe ? authOptions.Value.RememberMeLifetime : authOptions.Value.SessionLifetime),
+                };
+
+                await context.SignInAsync(AuthExtensions.AppCookieScheme, principal, properties);
+                return Results.Ok(new PasswordAuthSuccess());
+            }
+
+            return result.FailureCode switch
+            {
+                AuthResultCodes.InvalidCredentials => Results.Json(
+                    new ApiError(AuthResultCodes.InvalidCredentials, "Invalid credentials.", correlationId),
+                    statusCode: StatusCodes.Status401Unauthorized),
+                AuthResultCodes.LockedOut => Results.Json(
+                    new ApiError(AuthResultCodes.LockedOut, "Account is locked.", correlationId),
+                    statusCode: StatusCodes.Status423Locked),
+                _ => Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Login failed.",
+                    correlationId)),
+            };
+        }).AllowAnonymous().RateLimit();
+
+        group.MapPost("/register", async (
+            HttpContext context,
+            IAntiforgery antiforgery,
+            IPasswordAccountService passwordAccounts,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                await antiforgery.ValidateRequestAsync(context);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                return Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Antiforgery validation failed.",
+                    context.GetCorrelationId()));
+            }
+
+            var request = await context.Request.ReadFromJsonAsync<RegisterRequest>(cancellationToken);
+            if (request is null
+                || string.IsNullOrWhiteSpace(request.Email)
+                || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Email and password are required.",
+                    context.GetCorrelationId()));
+            }
+
+            if (request.Email.Length > PasswordAccountService.MaxEmailLength)
+            {
+                return Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Email is too long.",
+                    context.GetCorrelationId()));
+            }
+
+            var correlationId = context.GetCorrelationId();
+            var result = await passwordAccounts.RegisterAsync(
+                request.Email,
+                request.Password,
+                correlationId,
+                cancellationToken);
+
+            if (result.Success && result.User is not null)
+            {
+                var principal = BuildAppPrincipal(result.User);
+                await context.SignInAsync(AuthExtensions.AppCookieScheme, principal);
+                return Results.Ok(new PasswordAuthSuccess());
+            }
+
+            return result.FailureCode switch
+            {
+                AuthResultCodes.WeakPassword => Results.BadRequest(new ApiError(
+                    AuthResultCodes.WeakPassword,
+                    "Password does not meet requirements.",
+                    correlationId)),
+                AuthResultCodes.EmailTaken => Results.Json(
+                    new ApiError(AuthResultCodes.EmailTaken, "Email is already registered.", correlationId),
+                    statusCode: StatusCodes.Status409Conflict),
+                _ => Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Registration failed.",
+                    correlationId)),
+            };
+        }).AllowAnonymous().RateLimit();
+
         group.MapGet("/complete/{provider}", async (
             string provider,
             HttpContext context,
@@ -97,19 +232,7 @@ public static class AuthEndpoints
             var rememberMe = GetRememberMe(authenticateResult.Properties);
             var returnUrl = GetReturnUrl(authenticateResult.Properties);
 
-            var identity = new ClaimsIdentity(
-                new[]
-                {
-                    new Claim(CurrentUser.UserIdClaimType, result.User.Id.ToString()),
-                    new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(result.User.DisplayName) ? "Intervals user" : result.User.DisplayName),
-                },
-                AuthExtensions.AppCookieScheme);
-            if (!string.IsNullOrWhiteSpace(result.User.Email))
-            {
-                identity.AddClaim(new Claim(ClaimTypes.Email, result.User.Email));
-            }
-
-            var principal = new ClaimsPrincipal(identity);
+            var principal = BuildAppPrincipal(result.User);
             var properties = new AuthenticationProperties
             {
                 IsPersistent = rememberMe,
@@ -174,10 +297,14 @@ public static class AuthEndpoints
             {
                 new(AuthProviderNames.Google, "Google", linked.Contains(AuthProviderNames.Google)),
                 new(AuthProviderNames.X, "X", linked.Contains(AuthProviderNames.X)),
+                new(AuthProviderNames.Password, "Email", user.PasswordCredential is not null),
             };
 
+            var emailVerified = user.PasswordCredential?.EmailVerified == true
+                || user.ExternalLogins.Any(e => e.EmailVerified);
+
             return Results.Ok(new SessionResponse(
-                new SessionUser(user.Id.ToString(), user.DisplayName, user.Email, user.AvatarUrl),
+                new SessionUser(user.Id.ToString(), user.DisplayName, user.Email, user.AvatarUrl, emailVerified),
                 providers));
         }).RequireAuthorization().RateLimit();
 
@@ -195,4 +322,22 @@ public static class AuthEndpoints
 
     private static string GetReturnUrl(AuthenticationProperties? properties) =>
         ReturnUrlValidator.Sanitize(properties?.Items?["returnUrl"]);
+
+    private static ClaimsPrincipal BuildAppPrincipal(AppUser user)
+    {
+        var identity = new ClaimsIdentity(
+            new[]
+            {
+                new Claim(CurrentUser.UserIdClaimType, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.DisplayName) ? "Intervals user" : user.DisplayName),
+            },
+            AuthExtensions.AppCookieScheme);
+
+        if (!string.IsNullOrWhiteSpace(user.Email))
+        {
+            identity.AddClaim(new Claim(ClaimTypes.Email, user.Email));
+        }
+
+        return new ClaimsPrincipal(identity);
+    }
 }
