@@ -12,6 +12,8 @@ builder.AddIntervalsAuth();
 builder.Services.AddIntervalsEmail(builder.Configuration);
 builder.Services.AddIntervalsAuthTokens();
 builder.Services.AddIntervalsPasswordReset();
+builder.Services.AddIntervalsAccountSettings();
+builder.Services.AddIntervalsProviderLinking();
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
@@ -27,6 +29,8 @@ app.UseIntervalsAuth();
 app.MapAuthEndpoints();
 app.MapEmailVerificationEndpoints();
 app.MapPasswordResetEndpoints();
+app.MapAccountSettingsEndpoints();
+app.MapProviderLinkingEndpoints();
 
 app.MapGet("/api/status", () =>
     Results.Ok(new ApiStatus(

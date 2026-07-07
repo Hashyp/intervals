@@ -2,17 +2,21 @@
 
 Ear training for recognizing musical intervals — a Vite/React frontend with an
 ASP.NET Core API, orchestrated by .NET Aspire. The app requires a signed-in
-account; sign-in is via Google or X (social login).
+account; sign-in is via Google, Microsoft, or X (social login) or email +
+password. Password accounts verify their email and can recover via password
+reset; signed-in users manage their sign-in methods from `/account-settings`.
 
 ## Project layout
 
 ```
-apphost/                 Aspire AppHost (project-based) — orchestrates api, web, postgres
+apphost/                 Aspire AppHost (project-based) — orchestrates api, web, postgres, mailpit
 api/Intervals.Api/       ASP.NET Core minimal API — auth, sessions, status
-  Auth/                  Cookie auth, Google/X providers, account & session endpoints
+  Auth/                  Cookie auth, Google/Microsoft/X providers, password accounts,
+                         email verification, password reset, account linking & merge, sessions
   Data/                  EF Core model (AppUser, ExternalLogin, AuthEvent) + migrations
 src/                     Vite + React training app
-  auth/                  Auth shell: AuthProvider, LoginPage, ProtectedApp, AccountBar
+  auth/                  Auth shell: AuthProvider, LoginPage, ProtectedApp, AccountBar,
+                         ForgotPasswordPage, ResetPasswordPage, EmailVerificationBanner
 tests/
   Intervals.Api.Tests/   API integration tests (WebApplicationFactory + Testcontainers.PostgreSql)
   Intervals.AppHost.Tests/  Aspire distributed smoke tests (Aspire.Hosting.Testing)
@@ -57,6 +61,15 @@ startup and Aspire injects the PostgreSQL connection string.
 The frontend talks to the API through the same origin via the Vite dev proxy,
 which forwards `/api` and `/auth` to the `api` resource.
 
+A **Mailpit** resource (`mailpit`) also starts automatically in run mode and
+captures every outbound auth email — email-verification and password-reset
+messages land here instead of being sent to a real mailbox. Open the Mailpit
+web UI from the Aspire dashboard (or directly at `http://localhost:8025`;
+SMTP listens on `1025`). The AppHost injects `Mail__Smtp__Host` and
+`Mail__Smtp__Port` from Mailpit for you, so no email configuration is needed
+for local development. Mailpit is dev-only — it does **not** start during the
+distributed tests.
+
 ### Running parts in isolation
 
 ```bash
@@ -67,16 +80,21 @@ dotnet run --project api/Intervals.Api   # API only (needs ConnectionStrings:int
 ## Authentication & required provider secrets
 
 The app requires authentication. Anonymous requests to `/api/*` return `401`.
-Login uses **Google** and **X** OAuth. Each provider needs its own credentials,
-stored in .NET **user secrets** (never committed). The app runs without them, but
-the login buttons will not complete a real provider flow until they are set.
+Login uses **Google**, **Microsoft**, and **X** OAuth, plus email + password
+accounts (which verify their email and can recover via password reset). Each
+OAuth provider needs its own credentials, stored in .NET **user secrets**
+(never committed). The app runs without them, but the social-login buttons
+will not complete a real provider flow until they are set. Email/password
+sign-in, verification, and password reset work without any provider secrets.
 
-| Provider | User-secrets key                  | Where it comes from          |
-|----------|-----------------------------------|------------------------------|
-| Google   | `Authentication:Google:ClientId`     | Google Cloud Console — OAuth client ID |
-| Google   | `Authentication:Google:ClientSecret` | Google Cloud Console — OAuth client secret |
-| X        | `Authentication:X:ClientId`          | X developer portal — OAuth 2.0 client id |
-| X        | `Authentication:X:ClientSecret`      | X developer portal — OAuth 2.0 client secret |
+| Provider  | User-secrets key                     | Where it comes from          |
+|-----------|--------------------------------------|------------------------------|
+| Google    | `Authentication:Google:ClientId`     | Google Cloud Console — OAuth client ID |
+| Google    | `Authentication:Google:ClientSecret` | Google Cloud Console — OAuth client secret |
+| Microsoft | `Authentication:Microsoft:ClientId`     | Azure — Microsoft Entra ID app registration client ID |
+| Microsoft | `Authentication:Microsoft:ClientSecret` | Azure — Microsoft Entra ID app registration client secret |
+| X         | `Authentication:X:ClientId`          | X developer portal — OAuth 2.0 client id |
+| X         | `Authentication:X:ClientSecret`      | X developer portal — OAuth 2.0 client secret |
 
 > The PostgreSQL password (`Parameters:postgres-password`) is auto-generated and
 > auto-persisted by Aspire into the AppHost's user secrets — you do not set it.
@@ -88,8 +106,9 @@ the `api` resource** (shown in the Aspire dashboard when the app is running) plu
 the callback path:
 
 ```
-http://localhost:<api-port>/auth/callback/google   # Google
-http://localhost:<api-port>/auth/callback/x         # X
+http://localhost:<api-port>/auth/callback/google     # Google
+http://localhost:<api-port>/auth/callback/microsoft   # Microsoft
+http://localhost:<api-port>/auth/callback/x           # X
 ```
 
 Find the current `<api-port>`:
@@ -115,6 +134,20 @@ port in `apphost/Program.cs`:
    redirect URIs**.
 4. Copy the Client ID and Client Secret.
 
+### Microsoft setup
+
+1. Azure portal → **Microsoft Entra ID → App registrations → New registration**.
+2. Pick **Accounts in any Microsoft Entra ID directory (Any Microsoft Entra ID
+   tenant - Multitenant)** or **Personal Microsoft accounts only**, depending on
+   who should sign in. Leave **Redirect URI** for now.
+3. Under **Manage → Authentication → Add a platform → Web**, add
+   `https://localhost:<api-port>/auth/callback/microsoft` as a redirect URI.
+4. Under **Manage → Certificates & secrets → New client secret**, create a
+   secret and copy its **Value** immediately (Microsoft hides it later).
+5. Copy the **Application (client) ID** from the Overview page.
+6. The app requests only the `openid`, `email`, and `profile` scopes (no
+   `offline_access`) — no extra API permissions need to be granted.
+
 ### X setup
 
 1. X developer portal → your app → **User authentication settings**.
@@ -131,10 +164,12 @@ port in `apphost/Program.cs`:
 
 ```bash
 PROJECT=api/Intervals.Api
-dotnet user-secrets set "Authentication:Google:ClientId"     "<google-client-id>"     --project $PROJECT
-dotnet user-secrets set "Authentication:Google:ClientSecret" "<google-client-secret>" --project $PROJECT
-dotnet user-secrets set "Authentication:X:ClientId"          "<x-client-id>"          --project $PROJECT
-dotnet user-secrets set "Authentication:X:ClientSecret"      "<x-client-secret>"      --project $PROJECT
+dotnet user-secrets set "Authentication:Google:ClientId"       "<google-client-id>"       --project $PROJECT
+dotnet user-secrets set "Authentication:Google:ClientSecret"   "<google-client-secret>"   --project $PROJECT
+dotnet user-secrets set "Authentication:Microsoft:ClientId"    "<microsoft-client-id>"    --project $PROJECT
+dotnet user-secrets set "Authentication:Microsoft:ClientSecret" "<microsoft-client-secret>" --project $PROJECT
+dotnet user-secrets set "Authentication:X:ClientId"            "<x-client-id>"            --project $PROJECT
+dotnet user-secrets set "Authentication:X:ClientSecret"        "<x-client-secret>"        --project $PROJECT
 ```
 
 Verify: `dotnet user-secrets list --project api/Intervals.Api`
@@ -150,6 +185,37 @@ Secrets are read at API startup — restart Aspire after changing them
   challenge but is rejected — e.g. Google shows
   `Error 401: invalid_client` / "The OAuth client was not found". Replace it with
   a real client id from the provider console.
+- Microsoft returns `invalid_client` / `AADSTS7000215` if the client secret is
+  wrong, expired, or the **Value** (not the **Secret ID**) was not copied.
+- Email/password sign-up, email verification, and password reset do **not**
+  need any OAuth secrets — they work as soon as Mailpit is running.
+
+### Account security flows
+
+These flows work without any OAuth provider secrets; they only need Mailpit
+running (automatic under `aspire run`).
+
+- **Email verification** — registering a password account sends a verification
+  email with a 24h token (`Mail:VerificationTokenLifetimeHours`). Clicking the
+  link hits `GET /auth/email-verification/confirm?token=...`. Unverified users
+  see a banner with a resend button that calls the authenticated, rate-limited
+  `POST /auth/email-verification/request`, which always returns generic success
+  (no user enumeration).
+- **Password reset** — `/forgot-password` (`POST /auth/password/forgot`,
+  anonymous, rate-limited, generic success, no user enumeration) emails a 1h
+  token (`Mail:PasswordResetTokenLifetimeHours`); `/reset-password` consumes it
+  via `POST /auth/password/reset`. A successful reset clears lockout, rotates
+  the security stamp (invalidating other sessions), and marks the email
+  verified.
+- **Account settings (`/account-settings`)** — signed-in users manage their
+  sign-in methods: add a password to a social-only account, change password,
+  link more providers (Google/Microsoft/X) via an OAuth challenge, and unlink a
+  provider. Unlinking is blocked when it would leave the account with no
+  remaining sign-in method.
+- **Safe account merge** — if a provider being linked is already attached to
+  another account, the app asks the user to explicitly confirm a merge (proof
+  of control of both accounts). Matching emails **never** auto-merge; merge is
+  always an explicit, confirmed action.
 
 ## Testing
 
@@ -182,8 +248,14 @@ npm run test:watch
   persistent PostgreSQL volume holds a different password than the current run.
   Remove the volume and let Aspire recreate it:
   `docker volume rm intervals-postgres-data`, then `aspire run` again.
-- **`invalid_client` from Google/X** — provider secret is missing or still the
-  dummy placeholder; see [Authentication & required provider secrets](#authentication--required-provider-secrets).
+- **`invalid_client` from Google/Microsoft/X** — provider secret is missing,
+  still the dummy placeholder, or (for Microsoft) the secret **Value** was not
+  copied; see [Authentication & required provider secrets](#authentication--required-provider-secrets).
+- **No verification / reset email arrives** — under `aspire run` these are
+  captured by Mailpit; open the `mailpit` resource in the Aspire dashboard
+  (or `http://localhost:8025`). Running the API outside Aspire requires
+  `Mail__Smtp__Host`/`Mail__Smtp__Port` (and the rest of the `Mail:*` overrides)
+  to point at a real SMTP server.
 - **Login works but redirects to the wrong origin** — `Web__BaseUrl` is injected
   by the AppHost in run mode; if you run the API outside Aspire, set it yourself.
 
@@ -191,6 +263,8 @@ npm run test:watch
 
 Before a public launch: move provider secrets from user secrets into the hosting
 platform's managed secret store, register the production-origin callback URIs
-(`https://<origin>/auth/callback/google`, `.../x`), persist ASP.NET Core
-data-protection keys, and run the API behind HTTPS with forwarded headers
-configured.
+(`https://<origin>/auth/callback/google`, `.../microsoft`, `.../x`), persist
+ASP.NET Core data-protection keys, and run the API behind HTTPS with forwarded
+headers configured. Replace the local Mailpit SMTP target with a real
+transactional email provider by setting `Mail:Smtp:Host`/`Port` (and
+`Mail:FromAddress`/`FromName`/`AppBaseUrl`) in the hosting environment.

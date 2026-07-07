@@ -3,6 +3,8 @@ import { useAuth } from "./AuthProvider";
 import { LoginPage } from "./LoginPage";
 import { ForgotPasswordPage } from "./ForgotPasswordPage";
 import { ResetPasswordPage } from "./ResetPasswordPage";
+import { AccountSettingsPage } from "./AccountSettingsPage";
+import { MergeConfirmPage } from "./MergeConfirmPage";
 import { AccountBar } from "./AccountBar";
 
 const ANON_PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
@@ -46,6 +48,24 @@ export function ProtectedApp({ children }: { children: ReactNode }) {
       return <ResetPasswordPage />;
     }
     return <LoginPage />;
+  }
+
+  const pathname = window.location.pathname;
+  if (pathname === "/account-settings") {
+    return (
+      <>
+        <AccountBar />
+        <AccountSettingsPage />
+      </>
+    );
+  }
+  if (pathname === "/merge-confirm") {
+    return (
+      <>
+        <AccountBar />
+        <MergeConfirmPage />
+      </>
+    );
   }
 
   return (

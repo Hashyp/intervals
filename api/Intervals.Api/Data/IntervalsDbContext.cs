@@ -27,6 +27,7 @@ public sealed class IntervalsDbContext : DbContext
             entity.Property(e => e.EmailNormalized).HasMaxLength(320);
             entity.Property(e => e.AvatarUrl).HasMaxLength(2048);
             entity.HasIndex(e => e.EmailNormalized);
+            entity.HasIndex(e => e.MergedIntoUserId);
         });
 
         modelBuilder.Entity<ExternalLogin>(entity =>
