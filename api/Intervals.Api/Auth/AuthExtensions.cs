@@ -120,6 +120,36 @@ public static class AuthExtensions
             });
         }
 
+        var microsoftSection = builder.Configuration.GetSection("Authentication:Microsoft");
+        var microsoftClientId = microsoftSection["ClientId"];
+        if (!string.IsNullOrWhiteSpace(microsoftClientId))
+        {
+            authentication.AddMicrosoftAccount(AuthProviderNames.MicrosoftScheme, options =>
+            {
+                options.ClientId = microsoftClientId!;
+                options.ClientSecret = microsoftSection["ClientSecret"] ?? string.Empty;
+                options.CallbackPath = "/auth/callback/microsoft";
+                options.SignInScheme = ExternalCookieScheme;
+                options.SaveTokens = false;
+                options.Scope.Clear();
+                options.Scope.Add("openid");
+                options.Scope.Add("email");
+                options.Scope.Add("profile");
+                options.Events = new OAuthEvents
+                {
+                    OnRemoteFailure = context =>
+                    {
+                        var code = IsCancellation(context.Failure)
+                            ? AuthResultCodes.Cancelled
+                            : AuthResultCodes.ProviderError;
+                        context.HandleResponse();
+                        context.Response.Redirect(AuthRedirect.Build(webBaseUrl, authOptions.LoginPath, code));
+                        return Task.CompletedTask;
+                    },
+                };
+            });
+        }
+
         var xSection = builder.Configuration.GetSection("Authentication:X");
         var xClientId = xSection["ClientId"];
         if (!string.IsNullOrWhiteSpace(xClientId))

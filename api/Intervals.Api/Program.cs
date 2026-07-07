@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Intervals.Api.Auth;
 using Intervals.Api.Data;
+using Intervals.Api.Email;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddNpgsqlDbContext<IntervalsDbContext>("intervalsdb");
 builder.AddIntervalsAuth();
+builder.Services.AddIntervalsEmail(builder.Configuration);
+builder.Services.AddIntervalsAuthTokens();
+builder.Services.AddIntervalsPasswordReset();
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
@@ -21,6 +25,8 @@ using (var scope = app.Services.CreateScope())
 app.UseIntervalsAuth();
 
 app.MapAuthEndpoints();
+app.MapEmailVerificationEndpoints();
+app.MapPasswordResetEndpoints();
 
 app.MapGet("/api/status", () =>
     Results.Ok(new ApiStatus(

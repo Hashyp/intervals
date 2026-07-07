@@ -9,6 +9,7 @@ public sealed class PasswordCredential
     public string EmailNormalized { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public bool EmailVerified { get; set; }
+    public DateTimeOffset? EmailVerifiedAtUtc { get; set; }
     public int FailedAttemptCount { get; set; }
     public DateTimeOffset? LockoutUntilUtc { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;

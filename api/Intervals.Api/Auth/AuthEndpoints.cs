@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Intervals.Api.Data.Entities;
+using Intervals.Api.Email;
 
 namespace Intervals.Api.Auth;
 
@@ -131,6 +132,9 @@ public static class AuthEndpoints
             HttpContext context,
             IAntiforgery antiforgery,
             IPasswordAccountService passwordAccounts,
+            AuthActionTokenService tokens,
+            IEmailSender emailSender,
+            IOptions<EmailOptions> emailOptions,
             CancellationToken cancellationToken) =>
         {
             try
@@ -175,6 +179,13 @@ public static class AuthEndpoints
             {
                 var principal = BuildAppPrincipal(result.User);
                 await context.SignInAsync(AuthExtensions.AppCookieScheme, principal);
+                await SendVerificationEmailAsync(
+                    result.User,
+                    tokens,
+                    emailSender,
+                    emailOptions.Value,
+                    context.GetCorrelationId(),
+                    cancellationToken);
                 return Results.Ok(new PasswordAuthSuccess());
             }
 
@@ -296,6 +307,7 @@ public static class AuthEndpoints
             var providers = new List<ProviderStatus>
             {
                 new(AuthProviderNames.Google, "Google", linked.Contains(AuthProviderNames.Google)),
+                new(AuthProviderNames.Microsoft, "Microsoft", linked.Contains(AuthProviderNames.Microsoft)),
                 new(AuthProviderNames.X, "X", linked.Contains(AuthProviderNames.X)),
                 new(AuthProviderNames.Password, "Email", user.PasswordCredential is not null),
             };
@@ -339,5 +351,48 @@ public static class AuthEndpoints
         }
 
         return new ClaimsPrincipal(identity);
+    }
+
+    private static async Task SendVerificationEmailAsync(
+        AppUser user,
+        AuthActionTokenService tokens,
+        IEmailSender emailSender,
+        EmailOptions emailOptions,
+        string? correlationId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(user.Email))
+        {
+            return;
+        }
+
+        string rawToken;
+        try
+        {
+            rawToken = await tokens.IssueAsync(
+                user.Id,
+                AuthActionTokenPurpose.EmailVerification,
+                user.Email,
+                TimeSpan.FromHours(emailOptions.VerificationTokenLifetimeHours),
+                correlationId,
+                cancellationToken);
+        }
+        catch
+        {
+            return;
+        }
+
+        var trimmedBase = (emailOptions.AppBaseUrl ?? string.Empty).TrimEnd('/');
+        var verificationLink = $"{trimmedBase}/auth/email-verification/confirm?token={rawToken}";
+        var (subject, html, text) = EmailTemplates.EmailVerification(user.DisplayName, verificationLink);
+
+        try
+        {
+            await emailSender.SendEmailAsync(user.Email, subject, html, text, cancellationToken);
+        }
+        catch
+        {
+            // Best-effort: a mail delivery failure must not break registration.
+        }
     }
 }

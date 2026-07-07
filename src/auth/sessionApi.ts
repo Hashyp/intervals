@@ -6,7 +6,7 @@ export type SessionUser = {
   emailVerified: boolean;
 };
 
-export type ProviderId = "google" | "x" | "password";
+export type ProviderId = "google" | "microsoft" | "x" | "password";
 
 export type ProviderStatus = {
   id: ProviderId;
@@ -112,4 +112,15 @@ export async function loginWithPassword(
   rememberMe: boolean,
 ): Promise<void> {
   await postAuthForm("/auth/login/password", { email, password, rememberMe });
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await postAuthForm("/auth/password/forgot", { email });
+}
+
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<void> {
+  await postAuthForm("/auth/password/reset", { token, password });
 }

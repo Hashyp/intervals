@@ -1,7 +1,18 @@
 import { useEffect, type ReactNode } from "react";
 import { useAuth } from "./AuthProvider";
 import { LoginPage } from "./LoginPage";
+import { ForgotPasswordPage } from "./ForgotPasswordPage";
+import { ResetPasswordPage } from "./ResetPasswordPage";
 import { AccountBar } from "./AccountBar";
+
+const ANON_PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
+
+function isAnonymousAllowedPath(pathname: string): boolean {
+  if (ANON_PUBLIC_PATHS.includes(pathname)) {
+    return true;
+  }
+  return pathname.startsWith("/intervals/login");
+}
 
 export function ProtectedApp({ children }: { children: ReactNode }) {
   const { loading, authenticated } = useAuth();
@@ -10,12 +21,10 @@ export function ProtectedApp({ children }: { children: ReactNode }) {
     if (loading) {
       return;
     }
-    const onLogin =
-      window.location.pathname === "/login" ||
-      window.location.pathname.startsWith("/intervals/login");
-    if (!authenticated && !onLogin) {
+    const onPublicAnonPath = isAnonymousAllowedPath(window.location.pathname);
+    if (!authenticated && !onPublicAnonPath) {
       window.history.replaceState({}, "", "/login");
-    } else if (authenticated && onLogin) {
+    } else if (authenticated && onPublicAnonPath) {
       window.history.replaceState({}, "", "/");
     }
   }, [loading, authenticated]);
@@ -29,6 +38,13 @@ export function ProtectedApp({ children }: { children: ReactNode }) {
   }
 
   if (!authenticated) {
+    const pathname = window.location.pathname;
+    if (pathname === "/forgot-password") {
+      return <ForgotPasswordPage />;
+    }
+    if (pathname === "/reset-password") {
+      return <ResetPasswordPage />;
+    }
     return <LoginPage />;
   }
 

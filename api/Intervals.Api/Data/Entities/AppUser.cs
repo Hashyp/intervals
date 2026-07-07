@@ -10,6 +10,7 @@ public sealed class AppUser
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? LastLoginUtc { get; set; }
     public DateTimeOffset? DisabledUtc { get; set; }
+    public string? SecurityStamp { get; set; }
 
     public List<ExternalLogin> ExternalLogins { get; set; } = new();
 

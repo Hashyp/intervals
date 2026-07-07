@@ -53,4 +53,56 @@ public class ExternalProfileBuilderTests
         var principal = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "NoId") }, "Google"));
         Assert.Throws<System.InvalidOperationException>(() => _builder.Build("google", principal));
     }
+
+    [Fact]
+    public void Maps_microsoft_subject_from_name_identifier()
+    {
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "microsoft-oid-123"),
+            new Claim(ClaimTypes.Name, "Sam"),
+            new Claim(ClaimTypes.Email, "sam@example.com"),
+            new Claim("email_verified", "true"),
+        }, "Microsoft"));
+
+        var profile = _builder.Build("microsoft", principal);
+
+        Assert.Equal("microsoft", profile.Provider);
+        Assert.Equal("microsoft-oid-123", profile.ProviderUserId);
+        Assert.Equal("Sam", profile.DisplayName);
+        Assert.Equal("sam@example.com", profile.Email);
+        Assert.True(profile.EmailVerified);
+    }
+
+    [Fact]
+    public void Maps_microsoft_subject_from_oid_when_name_identifier_absent()
+    {
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim("oid", "microsoft-oid-fallback"),
+            new Claim(ClaimTypes.Name, "Sam"),
+        }, "Microsoft"));
+
+        var profile = _builder.Build("microsoft", principal);
+
+        Assert.Equal("microsoft", profile.Provider);
+        Assert.Equal("microsoft-oid-fallback", profile.ProviderUserId);
+    }
+
+    [Fact]
+    public void Maps_microsoft_profile_without_email()
+    {
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "microsoft-oid-456"),
+            new Claim(ClaimTypes.Name, "Sam"),
+        }, "Microsoft"));
+
+        var profile = _builder.Build("microsoft", principal);
+
+        Assert.Equal("microsoft", profile.Provider);
+        Assert.Equal("microsoft-oid-456", profile.ProviderUserId);
+        Assert.Null(profile.Email);
+        Assert.False(profile.EmailVerified);
+    }
 }
