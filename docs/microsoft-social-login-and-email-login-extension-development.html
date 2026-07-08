@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Microsoft Social Login and Email Login Extension Plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fa;
+        --panel: #ffffff;
+        --ink: #16202a;
+        --muted: #5c6674;
+        --line: #d9e0ea;
+        --soft: #eef3f8;
+        --accent: #0f766e;
+        --accent-ink: #134e4a;
+        --warn-bg: #fff7ed;
+        --warn-line: #fed7aa;
+        --ok-bg: #ecfdf5;
+        --ok-line: #a7f3d0;
+        --info-bg: #eff6ff;
+        --info-line: #bfdbfe;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        margin: 0 auto;
+        max-width: 1120px;
+        padding: 48px 24px 72px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 2.35rem;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        border-bottom: 1px solid var(--line);
+        font-size: 1.45rem;
+        margin-top: 36px;
+        padding-bottom: 10px;
+      }
+
+      h3 {
+        font-size: 1.06rem;
+        margin-top: 22px;
+      }
+
+      p {
+        margin: 12px 0;
+      }
+
+      a {
+        color: var(--accent-ink);
+      }
+
+      table {
+        border-collapse: collapse;
+        margin: 16px 0;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--soft);
+        font-weight: 700;
+      }
+
+      code {
+        background: var(--soft);
+        border: 1px solid #dde5ee;
+        border-radius: 4px;
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.92em;
+        padding: 1px 5px;
+      }
+
+      pre {
+        background: #101923;
+        border-radius: 8px;
+        color: #e8eef6;
+        margin: 16px 0;
+        overflow-x: auto;
+        padding: 16px;
+      }
+
+      pre code {
+        background: transparent;
+        border: 0;
+        color: inherit;
+        padding: 0;
+      }
+
+      ul,
+      ol {
+        padding-left: 24px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .pill {
+        background: #e6fffb;
+        border: 1px solid #99f6e4;
+        border-radius: 999px;
+        color: var(--accent-ink);
+        display: inline-flex;
+        font-size: 0.88rem;
+        font-weight: 700;
+        padding: 4px 10px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 18px;
+      }
+
+      .callout {
+        background: var(--warn-bg);
+        border: 1px solid var(--warn-line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 16px 18px;
+      }
+
+      .success {
+        background: var(--ok-bg);
+        border-color: var(--ok-line);
+      }
+
+      .info {
+        background: var(--info-bg);
+        border-color: var(--info-line);
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .flow {
+        counter-reset: step;
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .flow li {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 10px 0;
+        padding: 12px 14px 12px 46px;
+        position: relative;
+      }
+
+      .flow li::before {
+        background: var(--accent);
+        border-radius: 999px;
+        color: #ffffff;
+        content: counter(step);
+        counter-increment: step;
+        font-size: 0.82rem;
+        font-weight: 700;
+        height: 24px;
+        left: 14px;
+        line-height: 24px;
+        position: absolute;
+        text-align: center;
+        top: 12px;
+        width: 24px;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          padding: 32px 16px 56px;
+        }
+
+        h1 {
+          font-size: 1.82rem;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="pill">Feature spec and implementation plan</span>
+        <h1>Microsoft Social Login and Email Login Extension</h1>
+        <div class="meta">
+          <span>Status: Draft v0.1</span>
+          <span>Created: 2026-07-07</span>
+          <span>Repository: Intervals</span>
+          <span>Scope: auth extension planning</span>
+        </div>
+      </header>
+
+      <section class="panel success">
+        <h2>Executive Summary</h2>
+        <p>
+          The next auth increment should add <strong>Microsoft</strong> as the
+          third social login provider and then complete the missing email and
+          password account lifecycle: email verification, password reset,
+          account linking, and safe account merge handling.
+        </p>
+        <p>
+          Microsoft should follow the current Google and X pattern: the API owns
+          provider redirects and callbacks, the browser never stores provider
+          tokens, provider identity is persisted through <code>ExternalLogin</code>,
+          and <code>/api/session</code> exposes a provider status row for the UI.
+          Email and password extensions should build on the existing
+          <code>PasswordCredential</code> model, with Mailpit added to the
+          Aspire AppHost for local email capture.
+        </p>
+      </section>
+
+      <section>
+        <h2>Current Auth Baseline</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Current implementation</th>
+              <th>Planning implication</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Providers</td>
+              <td>
+                Google and X are registered in
+                <code>api/Intervals.Api/Auth/AuthExtensions.cs</code>. Password
+                login is implemented separately through
+                <code>PasswordAccountService</code>.
+              </td>
+              <td>
+                Microsoft should be added as a peer provider, not as a special
+                case in endpoint routing.
+              </td>
+            </tr>
+            <tr>
+              <td>Provider names</td>
+              <td>
+                <code>AuthProviderNames</code> normalizes provider ids and maps
+                them to authentication schemes.
+              </td>
+              <td>
+                Add <code>microsoft</code> and <code>Microsoft</code> here, then
+                let the existing <code>/auth/login/{provider}</code> and
+                <code>/auth/complete/{provider}</code> flow handle it.
+              </td>
+            </tr>
+            <tr>
+              <td>Sessions</td>
+              <td>
+                The API issues an HTTP-only app cookie and uses an external
+                temporary cookie while provider authentication completes.
+              </td>
+              <td>
+                Microsoft must use the same <code>ExternalCookieScheme</code>,
+                <code>SaveTokens = false</code>, remember-me propagation, and
+                remote-failure redirect behavior.
+              </td>
+            </tr>
+            <tr>
+              <td>Persistence</td>
+              <td>
+                <code>AppUser</code>, <code>ExternalLogin</code>,
+                <code>PasswordCredential</code>, and <code>AuthEvent</code> are
+                modeled through EF Core and PostgreSQL.
+              </td>
+              <td>
+                Microsoft does not require a schema change. Email verification,
+                password reset, and account linking do.
+              </td>
+            </tr>
+            <tr>
+              <td>Email/password</td>
+              <td>
+                Registration creates <code>PasswordCredential.EmailVerified =
+                false</code>; login works before verification; reset and email
+                confirmation flows do not exist yet.
+              </td>
+              <td>
+                Verification can be introduced without breaking existing users,
+                but product behavior must decide whether unverified users can
+                continue signing in.
+              </td>
+            </tr>
+            <tr>
+              <td>Account merge</td>
+              <td>
+                Tests assert that matching email alone does not auto-merge
+                accounts.
+              </td>
+              <td>
+                Preserve this rule. Linking and merge must be explicit and
+                require proof of control of both accounts.
+              </td>
+            </tr>
+            <tr>
+              <td>Local infrastructure</td>
+              <td>
+                The AppHost starts PostgreSQL and the Vite frontend. There is no
+                local email capture resource yet.
+              </td>
+              <td>
+                Add Mailpit through the C# AppHost in run mode and reference it
+                from the API for local email verification and reset flows.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Goals and Non-goals</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>Goals</h3>
+            <ul>
+              <li>Add Microsoft sign-in for personal, work, and school Microsoft accounts.</li>
+              <li>Keep Microsoft login consistent with Google and X in routing, cookies, audit events, profile mapping, and frontend status.</li>
+              <li>Provide email verification for password accounts with local delivery through Mailpit.</li>
+              <li>Provide password reset with one-time, expiring, hashed reset tokens.</li>
+              <li>Provide account linking and safe merge paths without email-only auto-merge.</li>
+              <li>Identify adjacent missing auth subfeatures and sequence them by risk and value.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Non-goals</h3>
+            <ul>
+              <li>Do not store Microsoft, Google, or X access tokens after login.</li>
+              <li>Do not grant Microsoft Graph data access beyond identity and email information needed for sign-in.</li>
+              <li>Do not merge accounts only because two providers return the same email.</li>
+              <li>Do not replace the custom auth model with ASP.NET Core Identity in this increment.</li>
+              <li>Do not add production email provider credentials to source control or local appsettings.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Microsoft Social Login Feature Spec</h2>
+        <h3>Provider Contract</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Concern</th>
+              <th>Decision</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Provider id</td>
+              <td><code>microsoft</code></td>
+            </tr>
+            <tr>
+              <td>Display label</td>
+              <td><code>Microsoft</code></td>
+            </tr>
+            <tr>
+              <td>Authentication scheme</td>
+              <td><code>Microsoft</code></td>
+            </tr>
+            <tr>
+              <td>Login start</td>
+              <td><code>POST /auth/login/microsoft</code></td>
+            </tr>
+            <tr>
+              <td>Callback path</td>
+              <td><code>/auth/callback/microsoft</code></td>
+            </tr>
+            <tr>
+              <td>Completion endpoint</td>
+              <td><code>GET /auth/complete/microsoft</code></td>
+            </tr>
+            <tr>
+              <td>Development config</td>
+              <td>
+                <code>Authentication:Microsoft:ClientId</code> and
+                <code>Authentication:Microsoft:ClientSecret</code> in .NET user
+                secrets, matching the current Google and X secret pattern.
+              </td>
+            </tr>
+            <tr>
+              <td>Scopes</td>
+              <td>
+                Request identity-oriented OIDC scopes: <code>openid</code>,
+                <code>email</code>, and <code>profile</code>. Do not request
+                <code>offline_access</code> because the app is not storing
+                refresh tokens.
+              </td>
+            </tr>
+            <tr>
+              <td>Durable provider key</td>
+              <td>
+                Prefer the framework-mapped <code>ClaimTypes.NameIdentifier</code>.
+                Keep a fallback to <code>sub</code> and Microsoft object-id style
+                claims only if tests show the handler emits them without
+                mapping.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>User Experience</h3>
+        <ul>
+          <li>The login page shows <strong>Continue with Microsoft</strong> alongside Google and X.</li>
+          <li>The Microsoft form posts to <code>/auth/login/microsoft</code> with the same sanitized <code>returnUrl</code> behavior as the other providers.</li>
+          <li>Provider cancellation and provider errors use the existing <code>auth=cancelled</code> and <code>auth=provider_error</code> messaging.</li>
+          <li>After success, the user lands on the captured local return URL and <code>/api/session</code> includes Microsoft as linked.</li>
+          <li>Provider buttons should be visually distinct but use the same layout density, disabled states, and tests as the existing login page.</li>
+        </ul>
+
+        <h3>Backend Behavior</h3>
+        <ul>
+          <li>Add <code>Microsoft.AspNetCore.Authentication.MicrosoftAccount</code> to the API project, version-aligned with the current ASP.NET Core packages.</li>
+          <li>Register the provider only when <code>Authentication:Microsoft:ClientId</code> is present, matching the current optional provider behavior.</li>
+          <li>Use <code>ExternalCookieScheme</code>, <code>CallbackPath = "/auth/callback/microsoft"</code>, and <code>SaveTokens = false</code>.</li>
+          <li>Use the same <code>OAuthEvents.OnRemoteFailure</code> handling as Google and X.</li>
+          <li>Extend <code>ExternalProfileBuilderTests</code> with Microsoft claims to lock down provider id, display name, email, verified state, and durable subject extraction.</li>
+          <li>Extend <code>AuthIntegrationTests</code> so <code>/api/session</code> reports Microsoft provider status.</li>
+        </ul>
+
+        <div class="callout">
+          <strong>Email claim caution.</strong>
+          Microsoft identity tokens do not guarantee that an <code>email</code>
+          claim is always present. Treat Microsoft email as optional. Do not use
+          email alone as an account key or merge signal.
+        </div>
+      </section>
+
+      <section>
+        <h2>Email Login Extension Feature Spec</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>Email Verification</h3>
+            <ul>
+              <li>Registration sends a verification email to the password credential email address.</li>
+              <li>The verification token is one-time, random, expiring, and stored only as a hash.</li>
+              <li>Verification marks <code>PasswordCredential.EmailVerified = true</code> and sets a verified timestamp.</li>
+              <li>Users can request a resend with rate limiting and without leaking whether an address exists.</li>
+              <li>Unverified signed-in users see a compact banner with resend action.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Password Reset</h3>
+            <ul>
+              <li>Forgot-password accepts an email address and always returns a generic success response.</li>
+              <li>If the email has a password credential, send a reset link through the email sender.</li>
+              <li>The reset token is one-time, hashed at rest, and short-lived.</li>
+              <li>Resetting the password clears lockout state, invalidates outstanding reset tokens, and rotates a user security stamp.</li>
+              <li>Users can sign in with the new password immediately after reset.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Account Linking</h3>
+            <ul>
+              <li>Authenticated users can link Microsoft, Google, X, and password credentials from account settings.</li>
+              <li>Linking a new social provider uses the provider challenge flow with a protected <code>mode=link</code> property.</li>
+              <li>Adding a password to a social-only account requires email verification before treating that email as verified.</li>
+              <li>Unlinking is allowed only when the account has at least one remaining usable login method.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Safe Merge Path</h3>
+            <ul>
+              <li>If a provider or password credential already belongs to another user, do not silently attach it.</li>
+              <li>Require proof of control of the currently signed-in account and the target account before merge.</li>
+              <li>Show an explicit confirmation screen with both account identities and the resulting primary account.</li>
+              <li>Merge inside one transaction, move auth credentials to the primary user, preserve audit history, and mark the secondary account as merged instead of deleting it.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Recommended Product Decisions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>Recommendation</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Can unverified email users sign in?</td>
+              <td>Yes initially, with a persistent verification banner.</td>
+              <td>
+                This avoids breaking existing password accounts created before
+                verification exists. Later, sensitive account actions can require
+                verified email.
+              </td>
+            </tr>
+            <tr>
+              <td>Can password reset be used before email verification?</td>
+              <td>Yes, if the user controls the inbox at reset time.</td>
+              <td>
+                A successful reset link proves current inbox control and should
+                also mark the password email as verified.
+              </td>
+            </tr>
+            <tr>
+              <td>Should social provider email verify the account email?</td>
+              <td>Only for that provider login record unless the provider supplies a clear verified email signal.</td>
+              <td>
+                Provider emails can be absent, aliases, or not equivalent to a
+                local password credential email.
+              </td>
+            </tr>
+            <tr>
+              <td>Should matching emails auto-link accounts?</td>
+              <td>No.</td>
+              <td>
+                Existing tests already encode this security decision. Explicit
+                linking is safer and auditable.
+              </td>
+            </tr>
+            <tr>
+              <td>Should Mailpit be available in distributed tests?</td>
+              <td>No by default; add it in AppHost run mode and use a fake sender in unit/integration tests.</td>
+              <td>
+                The current AppHost keeps dev-only UI resources out of smoke
+                tests. Mailpit should follow that pattern unless an end-to-end
+                email smoke test is explicitly added.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Data Model Plan</h2>
+        <h3>No Schema Change for Microsoft Login</h3>
+        <p>
+          Microsoft fits the existing <code>ExternalLogins</code> table:
+          <code>Provider = "microsoft"</code>, a durable
+          <code>ProviderUserId</code>, optional email, optional display name,
+          optional avatar URL, and last-login timestamps.
+        </p>
+
+        <h3>New Email and Account Action Token Table</h3>
+        <p>
+          Add a purpose-scoped token table instead of storing raw verification
+          or reset tokens on the user row.
+        </p>
+        <pre><code>AuthActionToken
+  Id uuid primary key
+  UserId uuid not null
+  Purpose varchar(64) not null
+  TokenHash varchar(128) not null
+  Email varchar(320) null
+  EmailNormalized varchar(320) null
+  CreatedUtc timestamptz not null
+  ExpiresUtc timestamptz not null
+  ConsumedUtc timestamptz null
+  RevokedUtc timestamptz null
+  CorrelationId varchar(64) null</code></pre>
+        <ul>
+          <li>Generate at least 32 random bytes for the public token and encode with base64url.</li>
+          <li>Store only a SHA-256 or stronger hash of the token.</li>
+          <li>Use purpose values such as <code>email_verification</code>, <code>password_reset</code>, and <code>account_merge</code>.</li>
+          <li>Index <code>Purpose</code> plus <code>TokenHash</code>.</li>
+          <li>Invalidate older active tokens for the same user, purpose, and email when a new token is issued.</li>
+        </ul>
+
+        <h3>Recommended User and Credential Additions</h3>
+        <ul>
+          <li>Add <code>PasswordCredential.EmailVerifiedAtUtc</code> for auditing.</li>
+          <li>Add <code>AppUser.SecurityStamp</code> or <code>SessionVersion</code> to support session invalidation after password reset and future security events.</li>
+          <li>Add <code>AppUser.MergedIntoUserId</code> and <code>AppUser.MergedUtc</code> if safe merge ships in the same increment.</li>
+          <li>Keep <code>PasswordCredentials.EmailNormalized</code> unique, and keep <code>AppUsers.EmailNormalized</code> non-unique.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Endpoint Plan</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Endpoint</th>
+              <th>Auth</th>
+              <th>Purpose</th>
+              <th>Security notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>POST /auth/login/microsoft</code></td>
+              <td>Anonymous</td>
+              <td>Start Microsoft login.</td>
+              <td>Existing provider login endpoint after provider map update.</td>
+            </tr>
+            <tr>
+              <td><code>GET /auth/complete/microsoft</code></td>
+              <td>Anonymous</td>
+              <td>Complete Microsoft login and issue app cookie.</td>
+              <td>Uses external cookie and validated return URL.</td>
+            </tr>
+            <tr>
+              <td><code>POST /auth/email-verification/request</code></td>
+              <td>Authenticated</td>
+              <td>Send or resend verification email for the signed-in password account.</td>
+              <td>CSRF protected, rate limited, generic success response.</td>
+            </tr>
+            <tr>
+              <td><code>GET /auth/email-verification/confirm</code></td>
+              <td>Anonymous</td>
+              <td>Consume verification token and mark email verified.</td>
+              <td>One-time token, redirects to the app with a safe status code.</td>
+            </tr>
+            <tr>
+              <td><code>POST /auth/password/forgot</code></td>
+              <td>Anonymous</td>
+              <td>Request password reset email.</td>
+              <td>No user enumeration; rate limited by IP and email hash.</td>
+            </tr>
+            <tr>
+              <td><code>POST /auth/password/reset</code></td>
+              <td>Anonymous</td>
+              <td>Consume reset token and set a new password.</td>
+              <td>CSRF not required if token is bearer proof, but rate limit and validate password policy.</td>
+            </tr>
+            <tr>
+              <td><code>POST /auth/password/change</code></td>
+              <td>Authenticated</td>
+              <td>Change password from account settings.</td>
+              <td>Require current password when a password credential already exists.</td>
+            </tr>
+            <tr>
+              <td><code>POST /auth/providers/link/{provider}</code></td>
+              <td>Authenticated</td>
+              <td>Start provider linking challenge.</td>
+              <td>Stores link mode and current user id in protected auth properties.</td>
+            </tr>
+            <tr>
+              <td><code>GET /auth/providers/complete/{provider}</code></td>
+              <td>Anonymous</td>
+              <td>Complete provider linking or route to merge confirmation.</td>
+              <td>Must not attach credentials that already belong to another user without explicit merge proof.</td>
+            </tr>
+            <tr>
+              <td><code>DELETE /auth/providers/{provider}</code></td>
+              <td>Authenticated</td>
+              <td>Unlink a provider from the current account.</td>
+              <td>Reject when it would leave the account without any usable login method.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Mailpit Development Resource</h2>
+        <p>
+          Add Mailpit to the C# AppHost as a dev-only resource, consistent with
+          the current pgAdmin and Vite run-mode pattern. The API should read
+          Aspire-injected Mailpit environment variables and send email through a
+          small <code>IEmailSender</code> abstraction.
+        </p>
+        <pre><code>if (builder.ExecutionContext.IsRunMode)
+{
+    var mailpit = builder.AddMailPit("mailpit")
+        .WithDataVolume("intervals-mailpit-data");
+
+    api.WithReference(mailpit);
+}</code></pre>
+        <ul>
+          <li>Add <code>CommunityToolkit.Aspire.Hosting.MailPit</code> to <code>apphost/Intervals.AppHost.csproj</code>, preferably through <code>aspire add mailpit</code>.</li>
+          <li>Keep Mailpit out of distributed smoke tests unless a specific email smoke test needs it.</li>
+          <li>Use <code>MAILPIT_HOST</code> and <code>MAILPIT_PORT</code> in development email sender configuration.</li>
+          <li>Expose Mailpit only through the Aspire dashboard in local development.</li>
+          <li>Use a fake in-memory sender in API tests for deterministic assertions.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Safe Account Linking Flow</h2>
+        <ol class="flow">
+          <li>
+            The signed-in user opens account settings and chooses a provider or
+            password method to add.
+          </li>
+          <li>
+            The API validates CSRF, verifies the current session, records
+            <code>mode=link</code>, <code>linkUserId</code>, and a recent-auth
+            timestamp in protected auth properties, then starts the provider
+            challenge.
+          </li>
+          <li>
+            On provider completion, the API builds an
+            <code>ExternalUserProfile</code> and checks whether that provider id
+            is already linked.
+          </li>
+          <li>
+            If the provider is already linked to the same user, the operation is
+            a no-op success.
+          </li>
+          <li>
+            If the provider is unlinked, attach it to the current user and write
+            an <code>account_link_success</code> event.
+          </li>
+          <li>
+            If the provider belongs to another user, require explicit merge
+            confirmation. The current session proves control of the primary
+            account; the just-completed provider login proves control of the
+            secondary credential.
+          </li>
+          <li>
+            Merge in one transaction: lock both user rows, move external logins
+            and password credential to the primary user if constraints allow,
+            preserve auth events, mark the secondary user as merged, and emit an
+            audit event.
+          </li>
+          <li>
+            Redirect to account settings and refresh <code>/api/session</code>
+            so the provider list reflects the new link state.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Implementation Plan</h2>
+        <h3>Phase 1: Microsoft Social Login</h3>
+        <ol>
+          <li>Add the Microsoft authentication package to <code>api/Intervals.Api/Intervals.Api.csproj</code>.</li>
+          <li>Add <code>Microsoft</code> constants and scheme mapping to <code>AuthProviderNames</code>.</li>
+          <li>Register <code>AddMicrosoftAccount</code> in <code>AddIntervalsAuth</code> using the same conditional config pattern as Google and X.</li>
+          <li>Set callback path, external sign-in scheme, token persistence policy, scopes, and remote failure behavior.</li>
+          <li>Extend <code>ExternalProfileBuilder</code> and tests only if Microsoft emits claims not covered by the generic fallback.</li>
+          <li>Add Microsoft to the <code>/api/session</code> provider status list.</li>
+          <li>Update <code>src/auth/sessionApi.ts</code> provider type to include <code>microsoft</code>.</li>
+          <li>Add the Microsoft login form and styling to <code>LoginPage.tsx</code> and <code>styles.css</code>.</li>
+          <li>Extend frontend and backend tests for provider rendering, provider session status, unknown provider behavior, and callback failure behavior.</li>
+          <li>Document Microsoft user secrets and redirect URI setup.</li>
+        </ol>
+
+        <h3>Phase 2: Email Delivery Foundation</h3>
+        <ol>
+          <li>Add Mailpit hosting integration to the AppHost and wire it to the API in run mode.</li>
+          <li>Add <code>IEmailSender</code> with development SMTP implementation and test fake implementation.</li>
+          <li>Add email options for from address, app base URL, and token lifetimes.</li>
+          <li>Add simple HTML and plain-text email templates for verification and reset messages.</li>
+          <li>Add tests for email sender selection and template output without depending on external SMTP.</li>
+        </ol>
+
+        <h3>Phase 3: Email Verification</h3>
+        <ol>
+          <li>Add <code>AuthActionToken</code> entity, EF configuration, and migration.</li>
+          <li>Issue verification token during registration and on resend request.</li>
+          <li>Add verification request and confirm endpoints.</li>
+          <li>Mark password email verified on valid token consumption.</li>
+          <li>Add session response fields or UI status handling needed for a verification banner.</li>
+          <li>Add integration tests for token expiry, replay, resend, verified session output, and generic responses.</li>
+        </ol>
+
+        <h3>Phase 4: Password Reset</h3>
+        <ol>
+          <li>Add forgot-password and reset-password endpoints.</li>
+          <li>Use the same token table with <code>password_reset</code> purpose.</li>
+          <li>Apply existing password policy during reset.</li>
+          <li>Clear lockout and failed attempts after successful reset.</li>
+          <li>Rotate security stamp or session version and invalidate outstanding reset tokens.</li>
+          <li>Add login-page forgot-password and reset-password UI states.</li>
+          <li>Add tests for generic forgot response, successful reset, expired token, replayed token, weak password, and login with the new password.</li>
+        </ol>
+
+        <h3>Phase 5: Account Settings, Linking, and Safe Merge</h3>
+        <ol>
+          <li>Add account settings UI showing linked Google, X, Microsoft, and email/password methods.</li>
+          <li>Add authenticated link-provider endpoints and provider completion routing for link mode.</li>
+          <li>Add add-password and change-password flows for social-only and password users.</li>
+          <li>Add unlink provider endpoint with last-login-method guard.</li>
+          <li>Add merge confirmation and transaction service for provider collision handling.</li>
+          <li>Add tests for no-op link, new link, collision requiring merge, confirmed merge, rejected merge, and unlink guard.</li>
+        </ol>
+
+        <h3>Phase 6: Hardening and Rollout</h3>
+        <ol>
+          <li>Enforce <code>DisabledUtc</code> during social and password login.</li>
+          <li>Record missing audit events such as login start, email verification sent, password reset requested, password reset completed, account linked, account unlinked, and account merged.</li>
+          <li>Add rate limit buckets for resend verification and forgot-password separate from the general auth window.</li>
+          <li>Review cookie invalidation behavior after password reset and account merge.</li>
+          <li>Add production email provider abstraction without changing endpoint behavior.</li>
+          <li>Run API tests, frontend tests, and AppHost smoke tests before enabling Microsoft in shared development.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Acceptance Criteria</h2>
+        <ul>
+          <li>Microsoft sign-in can create a new user and provider link.</li>
+          <li>Returning Microsoft sign-in reuses the existing provider link and user.</li>
+          <li>Google, X, Microsoft, and Email provider statuses are returned by <code>/api/session</code>.</li>
+          <li>Provider email collisions do not auto-merge users.</li>
+          <li>Email verification sends through Mailpit in local AppHost runs.</li>
+          <li>Email verification tokens cannot be replayed after consumption.</li>
+          <li>Password reset responses do not reveal whether an email exists.</li>
+          <li>Password reset tokens expire and cannot be replayed.</li>
+          <li>Account linking never steals a credential already attached to another user without explicit merge confirmation.</li>
+          <li>Unlinking cannot leave an account with no usable sign-in method.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Other Missing Auth Subfeatures</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Priority</th>
+              <th>Subfeature</th>
+              <th>Why it matters</th>
+              <th>Recommended timing</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>P1</td>
+              <td>Resend verification</td>
+              <td>Required support path for users who miss or lose the first email.</td>
+              <td>Ship with email verification.</td>
+            </tr>
+            <tr>
+              <td>P1</td>
+              <td>Change password</td>
+              <td>Users who know their current password need a safer path than reset.</td>
+              <td>Ship with password reset or account settings.</td>
+            </tr>
+            <tr>
+              <td>P1</td>
+              <td>Add password to social-only account</td>
+              <td>Provides continuity if a social provider is unavailable or the user loses provider access.</td>
+              <td>Ship with account linking.</td>
+            </tr>
+            <tr>
+              <td>P1</td>
+              <td>Disabled account enforcement</td>
+              <td><code>AppUser.DisabledUtc</code> exists but login currently needs explicit checks.</td>
+              <td>Before public launch.</td>
+            </tr>
+            <tr>
+              <td>P1</td>
+              <td>Security-stamp/session invalidation</td>
+              <td>Password reset and merge should invalidate stale sessions where appropriate.</td>
+              <td>Before password reset ships.</td>
+            </tr>
+            <tr>
+              <td>P2</td>
+              <td>Change email</td>
+              <td>Needed for password accounts when inbox ownership changes.</td>
+              <td>After email verification and reset are stable.</td>
+            </tr>
+            <tr>
+              <td>P2</td>
+              <td>Provider unlink</td>
+              <td>Users need control over linked providers, with last-method guard.</td>
+              <td>With account settings.</td>
+            </tr>
+            <tr>
+              <td>P2</td>
+              <td>Security event notifications</td>
+              <td>Notify users after password reset, email change, provider link, unlink, or merge.</td>
+              <td>After email sender foundation exists.</td>
+            </tr>
+            <tr>
+              <td>P2</td>
+              <td>Auth event admin/support view</td>
+              <td>Useful for debugging login failures and account support without exposing secrets.</td>
+              <td>After audit event coverage improves.</td>
+            </tr>
+            <tr>
+              <td>P2</td>
+              <td>Production email provider</td>
+              <td>Mailpit is local only; production needs a managed provider and secret storage.</td>
+              <td>Before hosted beta.</td>
+            </tr>
+            <tr>
+              <td>P3</td>
+              <td>Passkeys or MFA</td>
+              <td>Improves account security once basic recovery and linking flows are reliable.</td>
+              <td>After account settings foundation.</td>
+            </tr>
+            <tr>
+              <td>P3</td>
+              <td>Device/session management</td>
+              <td>Lets users revoke old sessions and inspect active sign-ins.</td>
+              <td>After security-stamp support.</td>
+            </tr>
+            <tr>
+              <td>P3</td>
+              <td>Abuse controls</td>
+              <td>CAPTCHA, IP reputation, or progressive throttling may be needed if auth endpoints are exposed publicly.</td>
+              <td>After traffic patterns justify it.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Test Plan</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>Backend Tests</h3>
+            <ul>
+              <li><code>ExternalProfileBuilderTests</code> covers Microsoft claims.</li>
+              <li><code>AuthIntegrationTests</code> covers Microsoft provider status and provider collision behavior.</li>
+              <li>Password tests cover verification, reset, lockout reset, and generic forgot-password responses.</li>
+              <li>Account linking tests cover link, collision, merge, unlink, and last-method guard.</li>
+              <li>Token tests cover hashing, expiry, revocation, and replay prevention.</li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h3>Frontend Tests</h3>
+            <ul>
+              <li><code>LoginPage.test.tsx</code> checks Microsoft form action and button rendering.</li>
+              <li>Login page tests cover forgot-password and reset-password UI states.</li>
+              <li>Auth provider tests cover new provider id typing.</li>
+              <li>Account settings tests cover linked provider display and guarded unlink behavior.</li>
+            </ul>
+          </div>
+        </div>
+        <p>
+          Full end-to-end email tests can be deferred until the Mailpit resource
+          is stable. Unit and API integration tests should use a fake email
+          sender first so auth behavior remains deterministic.
+        </p>
+      </section>
+
+      <section>
+        <h2>External References</h2>
+        <ul>
+          <li>
+            <a href="https://learn.microsoft.com/en-us/aspnet/core/security/authentication/social/microsoft-logins?view=aspnetcore-10.0">Microsoft Account external login setup with ASP.NET Core</a>
+          </li>
+          <li>
+            <a href="https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc">Microsoft identity platform OIDC scopes</a>
+          </li>
+          <li>
+            <a href="https://learn.microsoft.com/en-us/aspnet/core/security/authentication/accconfirm?view=aspnetcore-10.0">ASP.NET Core account confirmation and password recovery</a>
+          </li>
+          <li>
+            <a href="https://aspire.dev/integrations/devtools/mailpit/mailpit-get-started/">Aspire Mailpit integration overview</a>
+          </li>
+          <li>
+            <a href="https://aspire.dev/integrations/devtools/mailpit/mailpit-host/">Aspire Mailpit AppHost setup</a>
+          </li>
+          <li>
+            <a href="https://aspire.dev/integrations/devtools/mailpit/mailpit-connect/">Aspire Mailpit connection properties</a>
+          </li>
+          <li>
+            <a href="https://mailpit.axllent.org/docs/">Mailpit documentation</a>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

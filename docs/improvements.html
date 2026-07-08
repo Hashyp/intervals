@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Intervals implementation improvement plan</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #11100e;
+      --panel: #1d1915;
+      --panel-2: #252018;
+      --ink: #f3eadc;
+      --muted: #c8bca9;
+      --line: #40372d;
+      --accent: #ecbb6a;
+      --ok: #93c59d;
+      --warn: #e4a95b;
+      --danger: #df7b6f;
+      --info: #8fb4dd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      color: var(--ink);
+      background: radial-gradient(circle at top right, rgba(236,187,106,.12), transparent 36rem), var(--bg);
+    }
+    main { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 64px; }
+    h1, h2, h3 { line-height: 1.2; margin: 0 0 .6rem; }
+    h1 { font-size: clamp(2rem, 4vw, 3.4rem); letter-spacing: -0.03em; }
+    h2 { margin-top: 2rem; font-size: 1.45rem; color: var(--accent); }
+    h3 { margin-top: 1.25rem; font-size: 1.05rem; }
+    p { margin: .4rem 0 1rem; color: var(--muted); }
+    a, code { color: var(--accent); }
+    code { background: rgba(236,187,106,.12); border: 1px solid rgba(236,187,106,.2); border-radius: 6px; padding: .08rem .3rem; }
+    .hero, .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(37,32,24,.9), rgba(29,25,21,.92));
+      box-shadow: 0 20px 60px rgba(0,0,0,.32);
+    }
+    .hero { padding: 30px; margin-bottom: 22px; }
+    .card { padding: 22px; margin: 18px 0; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; color: var(--muted); background: rgba(0,0,0,.18); font-size: .88rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; overflow: hidden; border-radius: 12px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 11px 12px; vertical-align: top; text-align: left; }
+    th { color: var(--ink); background: rgba(0,0,0,.2); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; }
+    tr:last-child td { border-bottom: 0; }
+    .prio { white-space: nowrap; font-weight: 700; }
+    .p1 { color: var(--danger); }
+    .p2 { color: var(--warn); }
+    .p3 { color: var(--info); }
+    .valid { color: var(--ok); font-weight: 700; }
+    .drop { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .step { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 14px 0; }
+    .step ul, .card ul { margin-top: .4rem; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } table { font-size: .92rem; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1>Intervals implementation improvement plan</h1>
+      <p>This document captures a multi-pass review of the current frontend and backend auth implementation, with emphasis on duplication, security risks, and UI/accessibility improvements. Because there is no callable subagent-spawn tool in this session, the requested handoff was simulated as three independent passes: draft reviewer, validation reviewer, and implementation planner.</p>
+      <div class="meta">
+        <span class="pill">Repository: Intervals</span>
+        <span class="pill">Generated: 2026-07-08</span>
+        <span class="pill">Focus: auth, remember-me, account settings</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Pass 1 — draft findings</h2>
+      <table>
+        <thead><tr><th>Area</th><th>Draft finding</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend duplication/UI</td><td>Remember-me is represented by separate checkboxes for Google and Microsoft, a separate controlled checkbox for email/password, and a forced hidden false value for X.</td><td><code>src/auth/LoginPage.tsx:129-165</code></td></tr>
+          <tr><td>Frontend duplication</td><td>Auth pages repeat card, form field, message, submit-state, and password-confirmation patterns across login, reset, forgot-password, and account settings.</td><td><code>src/auth/*.tsx</code></td></tr>
+          <tr><td>Frontend UI/accessibility</td><td>Account settings and merge confirmation use classes that have no CSS rules, while the email verification banner uses inline styles and auth buttons lack consistent focus-visible styling.</td><td><code>src/auth/AccountSettingsPage.tsx:202</code>, <code>src/auth/EmailVerificationBanner.tsx:39-77</code>, <code>src/styles.css</code></td></tr>
+          <tr><td>Frontend security</td><td>Password reset tokens stay in the browser URL after being read, increasing exposure via history, screenshots, and possible referrer leakage.</td><td><code>src/auth/ResetPasswordPage.tsx:8-18</code></td></tr>
+          <tr><td>Backend security</td><td>OAuth login and provider-link start endpoints are POST forms but do not validate antiforgery tokens, even though other auth mutations do.</td><td><code>api/Intervals.Api/Auth/AuthEndpoints.cs:32-64</code>, <code>api/Intervals.Api/Auth/ProviderLinkingEndpoints.cs:33-72</code></td></tr>
+          <tr><td>Backend security/availability</td><td>Rate limits are global fixed windows rather than partitioned per client/user/email, so one client can consume the shared auth budget.</td><td><code>api/Intervals.Api/Auth/AuthExtensions.cs:294-314</code></td></tr>
+          <tr><td>Backend security</td><td>The pending-merge cookie has a client-side expiry but the protected payload has no server-validated expiration.</td><td><code>api/Intervals.Api/Auth/AccountMergeService.cs:22-23</code>, <code>149-153</code>, <code>162-190</code></td></tr>
+          <tr><td>Backend security/deployability</td><td>Forwarded headers trust all networks/proxies unconditionally, allowing spoofed forwarded values outside a trusted reverse-proxy boundary.</td><td><code>api/Intervals.Api/Auth/AuthExtensions.cs:317-322</code></td></tr>
+          <tr><td>Backend duplication</td><td>Audit-event recording and email normalization are duplicated in multiple services/endpoints.</td><td><code>PasswordAccountService.cs:217-238</code>, <code>PasswordResetService.cs:179-213</code>, <code>AccountSettingsService.cs:331-365</code>, <code>PasswordResetEndpoints.cs:138-154</code></td></tr>
+          <tr><td>Backend duplication</td><td>Antiforgery try/catch, JSON-body validation, and API error mapping are repeated across auth endpoints.</td><td><code>AccountSettingsEndpoints.cs:38-54</code> and similar blocks</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Pass 2 — validation discussion</h2>
+      <table>
+        <thead><tr><th>Status</th><th>Finding</th><th>Validation notes</th></tr></thead>
+        <tbody>
+          <tr><td class="valid">Valid</td><td>Consolidate remember-me controls</td><td>The issue is visible, duplicated, test-covered only as “at least one” checkbox, and affects UX consistency because X cannot opt in.</td></tr>
+          <tr><td class="valid">Valid</td><td>Extract shared auth UI/API primitives</td><td>Duplication is broad and actionable; extract only stable primitives first to avoid over-generalizing.</td></tr>
+          <tr><td class="valid">Valid</td><td>Style missing auth account classes and remove inline banner styles</td><td>Classes are referenced but absent from the stylesheet, making this a concrete UI maintainability issue.</td></tr>
+          <tr><td class="valid">Valid</td><td>Scrub reset token from URL</td><td>The token is one-time and high entropy, but reducing browser/referrer exposure is a low-cost hardening step.</td></tr>
+          <tr><td class="valid">Valid</td><td>Add antiforgery to OAuth login/link starts</td><td>These POSTs initiate auth/linking state and accept remember/returnUrl inputs; consistency with other auth mutations is warranted.</td></tr>
+          <tr><td class="valid">Valid</td><td>Partition rate limits</td><td>The current limiters protect aggregate traffic but create an avoidable shared-bucket denial-of-service risk.</td></tr>
+          <tr><td class="valid">Valid</td><td>Server-enforce pending merge lifetime</td><td>Cookie expiration is client-side; a protected payload should also expire server-side.</td></tr>
+          <tr><td class="valid">Valid</td><td>Restrict forwarded header trust</td><td>Trust-all forwarded headers are only safe behind a known, isolated proxy layer; make that explicit/configurable.</td></tr>
+          <tr><td class="valid">Valid</td><td>Centralize auth events, normalization, endpoint filters</td><td>This is a straightforward maintainability refactor with security upside because policy changes happen in one place.</td></tr>
+          <tr><td class="drop">Dropped</td><td>Change app auth cookie to SameSite=Strict</td><td><code>Lax</code> is appropriate for OAuth redirects; Strict can break provider callback flows.</td></tr>
+          <tr><td class="drop">Dropped</td><td>Expose the antiforgery cookie to JavaScript</td><td>The app already gets the request token from a JSON endpoint; keeping the cookie HttpOnly is preferable.</td></tr>
+          <tr><td class="drop">Dropped</td><td>Treat provider buttons as a backend bug when provider secrets are missing</td><td>The backend safely redirects unknown/unconfigured schemes. This remains a UI enhancement: expose availability and disable unavailable buttons.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Pass 3 — final valid improvements</h2>
+      <table>
+        <thead><tr><th>Priority</th><th>Improvement</th><th>Expected outcome</th></tr></thead>
+        <tbody>
+          <tr><td class="prio p1">P1</td><td>Protect OAuth login/link start POSTs with antiforgery validation.</td><td>Prevents cross-site initiation of auth/link flows and aligns all auth mutations behind the same CSRF policy.</td></tr>
+          <tr><td class="prio p1">P1</td><td>Enforce pending account-merge expiry server-side.</td><td>Makes the intended 10-minute merge window non-bypassable by cookie replay.</td></tr>
+          <tr><td class="prio p1">P1</td><td>Replace global auth rate-limit buckets with partitioned policies.</td><td>Reduces shared-bucket denial-of-service risk and allows safer per-IP/per-user throttling.</td></tr>
+          <tr><td class="prio p2">P2</td><td>Stop trusting forwarded headers from every source by default.</td><td>Prevents spoofed forwarded scheme/IP values in production unless the deployment explicitly configures trusted proxies.</td></tr>
+          <tr><td class="prio p2">P2</td><td>Consolidate remember-me into one control shared by Google, Microsoft, X, and email/password login.</td><td>Removes duplicate controls, makes X consistent, and simplifies tests.</td></tr>
+          <tr><td class="prio p2">P2</td><td>Centralize auth event recording, email normalization, antiforgery/error helpers, and CSRF fetch helpers.</td><td>Reduces repeated security-sensitive code paths and makes future auth changes easier to audit.</td></tr>
+          <tr><td class="prio p2">P2</td><td>Scrub reset tokens from the URL after capture.</td><td>Limits token exposure in browser history, screenshots, and referrer paths while preserving the in-memory token for submission.</td></tr>
+          <tr><td class="prio p3">P3</td><td>Extract shared auth UI components and complete missing auth CSS.</td><td>Improves maintainability, account-settings layout, focus states, and consistency across auth pages.</td></tr>
+          <tr><td class="prio p3">P3</td><td>Expose provider availability to the frontend and disable unavailable social-login buttons.</td><td>Prevents confusing provider-error redirects in local/dev environments without configured OAuth secrets.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Implementation plan</h2>
+      <div class="grid">
+        <div>
+          <h3>1. Backend hardening foundation</h3>
+          <div class="step">
+            <strong>1.1 Add shared helpers.</strong>
+            <ul>
+              <li>Create an <code>IAuthEventRecorder</code> service for <code>AuthEvents</code>.</li>
+              <li>Create one email normalization helper with max-length validation.</li>
+              <li>Create an endpoint filter/helper for antiforgery validation returning the existing <code>ApiError</code> shape.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>1.2 Protect OAuth start endpoints.</strong>
+            <ul>
+              <li>Validate antiforgery in <code>/auth/login/{provider}</code> and <code>/auth/providers/link/{provider}</code>.</li>
+              <li>Load a request token in auth/account pages and include it in native form posts as the antiforgery form field.</li>
+              <li>Add integration tests proving missing tokens return 400 and valid tokens still challenge/redirect.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>1.3 Enforce merge-cookie expiry.</strong>
+            <ul>
+              <li>Use <code>ITimeLimitedDataProtector</code> or include an <code>expiresUtc</code> value in the protected payload and validate it on read.</li>
+              <li>Add tests for valid, expired, tampered, and primary-mismatch pending-merge cookies.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>1.4 Partition rate limits.</strong>
+            <ul>
+              <li>Replace <code>AddFixedWindowLimiter</code> global policies with <code>AddPolicy</code> and <code>RateLimitPartition.GetFixedWindowLimiter</code>.</li>
+              <li>Partition generic auth by authenticated user ID when present, otherwise remote IP; partition password reset by remote IP plus normalized email where practical.</li>
+              <li>Keep response behavior at 429 and add targeted tests for independent partitions.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>1.5 Configure forwarded headers safely.</strong>
+            <ul>
+              <li>Do not clear known proxies/networks unconditionally in production.</li>
+              <li>Add configuration for trusted proxy IPs/networks; allow trust-all only in development/testing or behind an explicit opt-in.</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <h3>2. Frontend consolidation and UI polish</h3>
+          <div class="step">
+            <strong>2.1 Consolidate remember-me.</strong>
+            <ul>
+              <li>Define a social-provider config array and render provider forms from it.</li>
+              <li>Render exactly one <code>Remember me</code> checkbox near the login actions.</li>
+              <li>Write the shared value into each social form via hidden <code>rememberMe</code> input and into password login JSON.</li>
+              <li>Update tests to assert one visible checkbox, all providers include the current value, and X supports remembering too.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>2.2 Add antiforgery token support for native forms.</strong>
+            <ul>
+              <li>Create <code>useAntiforgeryToken</code> or preload through <code>AuthProvider</code>.</li>
+              <li>Disable native provider/link buttons while the token is loading, or show a retryable error if token loading fails.</li>
+              <li>Add hidden <code>__RequestVerificationToken</code> fields to social login/link forms.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>2.3 Extract UI primitives.</strong>
+            <ul>
+              <li>Add <code>AuthCard</code>, <code>AuthMessage</code>, <code>AuthField</code>, <code>PasswordConfirmFields</code>, and optional <code>SubmitButton</code> components.</li>
+              <li>Refactor login, forgot/reset password, merge confirm, and account settings incrementally to avoid a large risky rewrite.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>2.4 Complete CSS and accessibility polish.</strong>
+            <ul>
+              <li>Add styles for <code>.auth-providers</code>, <code>.auth-providers__item</code>, <code>.auth-form--inline</code>, <code>.auth-form-actions</code>, <code>.auth-merge-accounts</code>, and <code>.account-bar__verify</code>.</li>
+              <li>Move inline styles out of <code>EmailVerificationBanner</code>.</li>
+              <li>Add <code>:focus-visible</code> styles for auth buttons, links, and account-bar actions.</li>
+              <li>Replace <code>window.confirm</code> unlink flow with an accessible in-page confirmation pattern when time permits.</li>
+            </ul>
+          </div>
+          <div class="step">
+            <strong>2.5 Reduce token exposure.</strong>
+            <ul>
+              <li>In <code>ResetPasswordPage</code>, capture the token once and immediately <code>replaceState</code> to remove it from the address bar.</li>
+              <li>Keep the token only in component state for the reset submission.</li>
+              <li>Add tests proving the token is submitted while the visible URL no longer contains it.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Suggested test checklist</h2>
+      <ul>
+        <li><code>npm test</code> after frontend refactors.</li>
+        <li><code>dotnet test</code> after backend helper/rate-limit/antiforgery changes.</li>
+        <li>Manual browser pass: login page visual layout, one remember-me control, keyboard focus order, provider form posts, account-settings provider list, merge confirmation.</li>
+        <li>Security regression pass: missing CSRF on all POST/DELETE auth endpoints, expired pending-merge cookie, partitioned rate limits, reset-token URL scrubbing.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
