@@ -26,7 +26,7 @@ public sealed class AuthActionTokenService(
         CancellationToken ct = default)
     {
         var now = timeProvider.GetUtcNow();
-        var normalized = NormalizeEmail(email);
+        var normalized = AuthEmail.Normalize(email, int.MaxValue);
         var rawBytes = RandomNumberGenerator.GetBytes(TokenByteLength);
         var publicToken = Base64UrlEncoder.Encode(rawBytes);
         var tokenHash = Base64UrlEncoder.Encode(SHA256.HashData(rawBytes));
@@ -137,7 +137,7 @@ public sealed class AuthActionTokenService(
         CancellationToken ct = default)
     {
         var now = timeProvider.GetUtcNow();
-        var normalized = NormalizeEmail(email);
+        var normalized = AuthEmail.Normalize(email, int.MaxValue);
         await RevokeActiveAsync(userId, purpose, normalized, now, ct);
     }
 
@@ -162,9 +162,6 @@ public sealed class AuthActionTokenService(
             s => s.SetProperty(t => t.RevokedUtc, (DateTimeOffset?)now),
             ct);
     }
-
-    private static string? NormalizeEmail(string? email) =>
-        string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToUpperInvariant();
 
     internal static class Base64UrlEncoder
     {

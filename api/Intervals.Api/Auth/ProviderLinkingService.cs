@@ -11,6 +11,7 @@ namespace Intervals.Api.Auth;
 
 public sealed class ProviderLinkingService(
     IntervalsDbContext db,
+    IAuthEventRecorder recorder,
     ILogger<ProviderLinkingService> logger) : IProviderLinkingService
 {
     public const string LinkSuccessEventType = "account_link_success";
@@ -44,7 +45,7 @@ public sealed class ProviderLinkingService(
 
         await AttachAsync(profile, primaryUserId, correlationId, cancellationToken);
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             LinkSuccessEventType,
             primaryUserId,
             profile.Provider,
@@ -80,26 +81,6 @@ public sealed class ProviderLinkingService(
             LastLoginUtc = now,
         });
 
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task RecordAsync(
-        string eventType,
-        Guid? userId,
-        string? provider,
-        bool success,
-        string? correlationId,
-        CancellationToken cancellationToken)
-    {
-        db.AuthEvents.Add(new AuthEvent
-        {
-            UserId = userId,
-            Provider = provider,
-            EventType = eventType,
-            OccurredUtc = DateTimeOffset.UtcNow,
-            Success = success,
-            CorrelationId = correlationId,
-        });
         await db.SaveChangesAsync(cancellationToken);
     }
 }

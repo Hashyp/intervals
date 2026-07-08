@@ -271,6 +271,7 @@ public static class AuthExtensions
         builder.Services.AddScoped<IAccountService, AccountService>();
         builder.Services.AddSingleton<PasswordPolicy>();
         builder.Services.AddScoped<IPasswordAccountService, PasswordAccountService>();
+        builder.Services.AddScoped<IAuthEventRecorder, AuthEventRecorder>();
         builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.PasswordHasher<AppUser>>();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddMemoryCache();

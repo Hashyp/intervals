@@ -31,16 +31,9 @@ public static class EmailVerificationEndpoints
             IntervalsDbContext db,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var userId = CurrentUser.GetUserId(context.User);

@@ -31,16 +31,9 @@ public static class AuthEndpoints
 
         group.MapPost("/login/{provider}", async (string provider, HttpContext context, IAntiforgery antiforgery) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var authOptions = context.RequestServices.GetRequiredService<IOptions<AuthOptions>>().Value;
@@ -83,16 +76,9 @@ public static class AuthEndpoints
             IOptions<AuthOptions> authOptions,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var request = await context.Request.ReadFromJsonAsync<PasswordLoginRequest>(cancellationToken);
@@ -155,16 +141,9 @@ public static class AuthEndpoints
             IOptions<EmailOptions> emailOptions,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var request = await context.Request.ReadFromJsonAsync<RegisterRequest>(cancellationToken);

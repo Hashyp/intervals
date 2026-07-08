@@ -16,6 +16,7 @@ public sealed class PasswordAccountService(
     IOptions<AuthOptions> options,
     PasswordPolicy passwordPolicy,
     PasswordHasher<AppUser> hasher,
+    IAuthEventRecorder recorder,
     ILogger<PasswordAccountService> logger) : IPasswordAccountService
 {
     public const int MaxEmailLength = 320;
@@ -29,7 +30,7 @@ public sealed class PasswordAccountService(
         string? correlationId,
         CancellationToken cancellationToken = default)
     {
-        var normalized = NormalizeEmail(email);
+        var normalized = AuthEmail.Normalize(email, int.MaxValue);
 
         if (normalized is null)
         {
@@ -81,7 +82,7 @@ public sealed class PasswordAccountService(
         db.PasswordCredentials.Add(credential);
         await db.SaveChangesAsync(cancellationToken);
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             AuthEventTypes.RegisterSuccess,
             user.Id,
             AuthProviderNames.Password,
@@ -103,7 +104,7 @@ public sealed class PasswordAccountService(
         string? correlationId,
         CancellationToken cancellationToken = default)
     {
-        var normalized = NormalizeEmail(email);
+        var normalized = AuthEmail.Normalize(email, int.MaxValue);
 
         if (normalized is null)
         {
@@ -120,7 +121,7 @@ public sealed class PasswordAccountService(
             var throwawayHash = hasher.HashPassword(dummy, password);
             _ = hasher.VerifyHashedPassword(dummy, throwawayHash, password);
 
-            await RecordAsync(
+            await recorder.RecordAsync(
                 AuthEventTypes.LoginFailure,
                 userId: null,
                 AuthProviderNames.Password,
@@ -133,7 +134,7 @@ public sealed class PasswordAccountService(
 
         if (credential.User is { DisabledUtc: not null })
         {
-            await RecordAsync(
+            await recorder.RecordAsync(
                 AuthEventTypes.LoginFailure,
                 credential.UserId,
                 AuthProviderNames.Password,
@@ -146,7 +147,7 @@ public sealed class PasswordAccountService(
 
         if (credential.LockoutUntilUtc is { } lockout && lockout > DateTimeOffset.UtcNow)
         {
-            await RecordAsync(
+            await recorder.RecordAsync(
                 AuthEventTypes.LoginFailure,
                 credential.UserId,
                 AuthProviderNames.Password,
@@ -174,7 +175,7 @@ public sealed class PasswordAccountService(
             credential.UpdatedAtUtc = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
 
-            await RecordAsync(
+            await recorder.RecordAsync(
                 AuthEventTypes.LoginFailure,
                 credential.UserId,
                 AuthProviderNames.Password,
@@ -198,7 +199,7 @@ public sealed class PasswordAccountService(
         user.LastLoginUtc = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             AuthEventTypes.LoginSuccess,
             user.Id,
             AuthProviderNames.Password,
@@ -213,27 +214,4 @@ public sealed class PasswordAccountService(
 
         return new PasswordLoginResult(true, user, null);
     }
-
-    private async Task RecordAsync(
-        string eventType,
-        Guid? userId,
-        string? provider,
-        bool success,
-        string? correlationId,
-        CancellationToken cancellationToken)
-    {
-        db.AuthEvents.Add(new AuthEvent
-        {
-            UserId = userId,
-            Provider = provider,
-            EventType = eventType,
-            OccurredUtc = DateTimeOffset.UtcNow,
-            Success = success,
-            CorrelationId = correlationId,
-        });
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private static string? NormalizeEmail(string? email) =>
-        string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToUpperInvariant();
 }

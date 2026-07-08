@@ -10,7 +10,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Intervals.Api.Auth;
 
-public sealed class AccountService(IntervalsDbContext db, ILogger<AccountService> logger) : IAccountService
+public sealed class AccountService(
+    IntervalsDbContext db,
+    IAuthEventRecorder recorder,
+    ILogger<AccountService> logger) : IAccountService
 {
     public async Task<AccountLoginResult> LoginAsync(
         ExternalUserProfile profile,
@@ -31,7 +34,7 @@ public sealed class AccountService(IntervalsDbContext db, ILogger<AccountService
             {
                 DisplayName = string.IsNullOrWhiteSpace(profile.DisplayName) ? "Intervals user" : profile.DisplayName,
                 Email = profile.Email,
-                EmailNormalized = NormalizeEmail(profile.Email),
+                EmailNormalized = AuthEmail.Normalize(profile.Email, int.MaxValue),
                 AvatarUrl = profile.AvatarUrl,
                 CreatedUtc = DateTimeOffset.UtcNow,
                 LastLoginUtc = DateTimeOffset.UtcNow,
@@ -70,13 +73,13 @@ public sealed class AccountService(IntervalsDbContext db, ILogger<AccountService
             }
 
             user.Email = profile.Email;
-            user.EmailNormalized = NormalizeEmail(profile.Email);
+            user.EmailNormalized = AuthEmail.Normalize(profile.Email, int.MaxValue);
             user.AvatarUrl = profile.AvatarUrl;
             await db.SaveChangesAsync(cancellationToken);
             created = false;
         }
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             AuthEventTypes.LoginSuccess,
             user.Id,
             provider,
@@ -112,29 +115,6 @@ public sealed class AccountService(IntervalsDbContext db, ILogger<AccountService
         string? correlationId,
         CancellationToken cancellationToken = default)
     {
-        await RecordAsync(AuthEventTypes.Logout, userId, provider: null, success: true, correlationId, cancellationToken);
+        await recorder.RecordAsync(AuthEventTypes.Logout, userId, provider: null, success: true, correlationId, cancellationToken);
     }
-
-    private async Task RecordAsync(
-        string eventType,
-        Guid? userId,
-        string? provider,
-        bool success,
-        string? correlationId,
-        CancellationToken cancellationToken)
-    {
-        db.AuthEvents.Add(new AuthEvent
-        {
-            UserId = userId,
-            Provider = provider,
-            EventType = eventType,
-            OccurredUtc = DateTimeOffset.UtcNow,
-            Success = success,
-            CorrelationId = correlationId,
-        });
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private static string? NormalizeEmail(string? email) =>
-        string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToUpperInvariant();
 }

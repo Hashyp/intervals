@@ -20,9 +20,9 @@ public sealed class AccountSettingsService(
     AuthActionTokenService tokens,
     IEmailSender emailSender,
     IOptions<EmailOptions> emailOptions,
+    IAuthEventRecorder recorder,
     ILogger<AccountSettingsService> logger) : IAccountSettingsService
 {
-    private const int MaxEmailLength = 320;
     private readonly EmailOptions _emailOptions = emailOptions.Value;
 
     public async Task<AccountDetail> GetDetailAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -74,7 +74,7 @@ public sealed class AccountSettingsService(
         var verification = passwordHasher.VerifyHashedPassword(user, credential.PasswordHash, currentPassword);
         if (verification == PasswordVerificationResult.Failed)
         {
-            await RecordAsync(
+            await recorder.RecordAsync(
                 AuthEventTypes.PasswordChanged,
                 user.Id,
                 AuthProviderNames.Password,
@@ -86,7 +86,7 @@ public sealed class AccountSettingsService(
 
         if (!passwordPolicy.IsValid(newPassword, out _))
         {
-            await RecordAsync(
+            await recorder.RecordAsync(
                 AuthEventTypes.PasswordChanged,
                 user.Id,
                 AuthProviderNames.Password,
@@ -109,7 +109,7 @@ public sealed class AccountSettingsService(
             credential.Email,
             cancellationToken);
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             AuthEventTypes.PasswordChanged,
             user.Id,
             AuthProviderNames.Password,
@@ -134,7 +134,7 @@ public sealed class AccountSettingsService(
             return new PasswordManagementResult(false, AuthResultCodes.WeakPassword);
         }
 
-        var normalized = NormalizeEmail(email);
+        var normalized = AuthEmail.Normalize(email);
         if (normalized is null)
         {
             return new PasswordManagementResult(false, AuthResultCodes.InvalidRequest);
@@ -161,7 +161,7 @@ public sealed class AccountSettingsService(
         }
 
         var matchingExternal = user.ExternalLogins.FirstOrDefault(e =>
-            !string.IsNullOrWhiteSpace(e.Email) && NormalizeEmail(e.Email) == normalized);
+            !string.IsNullOrWhiteSpace(e.Email) && AuthEmail.Normalize(e.Email) == normalized);
 
         var verified = matchingExternal is not null && matchingExternal.EmailVerified;
         var now = DateTimeOffset.UtcNow;
@@ -188,7 +188,7 @@ public sealed class AccountSettingsService(
             await SendVerificationEmailAsync(user, trimmedEmail, correlationId, cancellationToken);
         }
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             AuthEventTypes.PasswordAdded,
             user.Id,
             AuthProviderNames.Password,
@@ -240,7 +240,7 @@ public sealed class AccountSettingsService(
         db.ExternalLogins.Remove(external);
         await db.SaveChangesAsync(cancellationToken);
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             AuthEventTypes.AccountUnlinked,
             user.Id,
             normalized,
@@ -326,41 +326,5 @@ public sealed class AccountSettingsService(
         {
             logger.LogWarning(ex, "Failed to send verification email for user {UserId}.", user.Id);
         }
-    }
-
-    private async Task RecordAsync(
-        string eventType,
-        Guid userId,
-        string? provider,
-        bool success,
-        string? correlationId,
-        CancellationToken cancellationToken)
-    {
-        db.AuthEvents.Add(new AuthEvent
-        {
-            UserId = userId,
-            Provider = provider,
-            EventType = eventType,
-            OccurredUtc = DateTimeOffset.UtcNow,
-            Success = success,
-            CorrelationId = correlationId,
-        });
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private static string? NormalizeEmail(string? email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return null;
-        }
-
-        var trimmed = email.Trim();
-        if (trimmed.Length > MaxEmailLength)
-        {
-            return null;
-        }
-
-        return trimmed.ToUpperInvariant();
     }
 }

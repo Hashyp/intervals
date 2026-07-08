@@ -19,10 +19,10 @@ public sealed class PasswordResetService(
     IEmailSender emailSender,
     IOptions<EmailOptions> emailOptions,
     AuthActionTokenService tokens,
+    IAuthEventRecorder recorder,
     ILogger<PasswordResetService> logger) : IPasswordResetService
 {
     private const string PasswordResetEventType = "password_reset";
-    private const int MaxEmailLength = 320;
 
     private readonly EmailOptions _emailOptions = emailOptions.Value;
 
@@ -31,7 +31,7 @@ public sealed class PasswordResetService(
         string? correlationId,
         CancellationToken cancellationToken = default)
     {
-        var normalized = NormalizeEmail(email);
+        var normalized = AuthEmail.Normalize(email);
         if (normalized is null)
         {
             return;
@@ -97,7 +97,7 @@ public sealed class PasswordResetService(
 
         if (!passwordPolicy.IsValid(newPassword, out _))
         {
-            await RecordAsync(
+            await recorder.RecordAsync(
                 PasswordResetEventType,
                 validated.UserId,
                 AuthProviderNames.Password,
@@ -146,7 +146,7 @@ public sealed class PasswordResetService(
             consumed.Email,
             cancellationToken);
 
-        await RecordAsync(
+        await recorder.RecordAsync(
             PasswordResetEventType,
             consumed.UserId,
             AuthProviderNames.Password,
@@ -174,41 +174,5 @@ public sealed class PasswordResetService(
         }
 
         return string.IsNullOrWhiteSpace(user.DisplayName) ? "there" : user.DisplayName;
-    }
-
-    private async Task RecordAsync(
-        string eventType,
-        Guid? userId,
-        string? provider,
-        bool success,
-        string? correlationId,
-        CancellationToken cancellationToken)
-    {
-        db.AuthEvents.Add(new AuthEvent
-        {
-            UserId = userId,
-            Provider = provider,
-            EventType = eventType,
-            OccurredUtc = DateTimeOffset.UtcNow,
-            Success = success,
-            CorrelationId = correlationId,
-        });
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private static string? NormalizeEmail(string? email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return null;
-        }
-
-        var trimmed = email.Trim();
-        if (trimmed.Length > MaxEmailLength)
-        {
-            return null;
-        }
-
-        return trimmed.ToUpperInvariant();
     }
 }

@@ -29,16 +29,9 @@ public static class PasswordResetEndpoints
             IntervalsDbContext db,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var body = await context.Request.ReadFromJsonAsync<ForgotPasswordRequest>(cancellationToken);
@@ -50,7 +43,7 @@ public static class PasswordResetEndpoints
                     context.GetCorrelationId()));
             }
 
-            var normalized = NormalizeEmail(body.Email);
+            var normalized = AuthEmail.Normalize(body.Email);
             if (normalized is not null)
             {
                 var credential = await db.PasswordCredentials
@@ -75,23 +68,15 @@ public static class PasswordResetEndpoints
 
             return Results.Ok(new { ok = true });
         }).AllowAnonymous().RequireRateLimiting("password-reset");
-
         group.MapPost("/reset", async (
             HttpContext context,
             IAntiforgery antiforgery,
             IPasswordResetService resets,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var body = await context.Request.ReadFromJsonAsync<ResetPasswordRequest>(cancellationToken);
@@ -133,24 +118,6 @@ public static class PasswordResetEndpoints
         }).AllowAnonymous().RateLimit();
 
         return app;
-    }
-
-    private const int MaxEmailLength = 320;
-
-    private static string? NormalizeEmail(string? email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return null;
-        }
-
-        var trimmed = email.Trim();
-        if (trimmed.Length > MaxEmailLength)
-        {
-            return null;
-        }
-
-        return trimmed.ToUpperInvariant();
     }
 }
 

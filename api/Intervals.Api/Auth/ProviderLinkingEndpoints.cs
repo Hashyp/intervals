@@ -32,16 +32,9 @@ public static class ProviderLinkingEndpoints
 
         group.MapPost("/link/{provider}", async (string provider, HttpContext context, IAntiforgery antiforgery) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var authOptions = context.RequestServices.GetRequiredService<IOptions<AuthOptions>>().Value;
@@ -161,16 +154,9 @@ public static class ProviderLinkingEndpoints
             IAccountMergeService merge,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             var userId = CurrentUser.GetUserId(context.User);
@@ -194,16 +180,9 @@ public static class ProviderLinkingEndpoints
             IAccountMergeService merge,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (await AuthRequests.ValidateAntiforgeryAsync(context, antiforgery) is { } antiforgeryError)
             {
-                await antiforgery.ValidateRequestAsync(context);
-            }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.BadRequest(new ApiError(
-                    AuthResultCodes.InvalidRequest,
-                    "Antiforgery validation failed.",
-                    context.GetCorrelationId()));
+                return antiforgeryError;
             }
 
             merge.ClearPendingMerge(context);
