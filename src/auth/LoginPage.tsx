@@ -7,6 +7,11 @@ import {
   register,
 } from "./sessionApi";
 import { currentReturnUrl } from "./returnUrl";
+import { AuthCard } from "./ui/AuthCard";
+import { AuthField } from "./ui/AuthField";
+import { AuthMessage } from "./ui/AuthMessage";
+import { PasswordConfirmFields } from "./ui/PasswordConfirmFields";
+import { SubmitButton } from "./ui/SubmitButton";
 
 const ERROR_MESSAGES: Record<string, string> = {
   cancelled: "Sign-in was cancelled. You can try again.",
@@ -166,174 +171,142 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-shell">
-      <main className="auth-card" aria-labelledby="login-title">
-        <h1 id="login-title">
-          Inter<span className="auth-brand">vals</span>
-        </h1>
-        <p className="auth-subtitle">Sign in to start training your ear.</p>
-        {authMessage ? (
-          <p className="auth-message" role="alert">
-            {authMessage}
+    <AuthCard
+      titleId="login-title"
+      titleBrand
+      subtitle="Sign in to start training your ear."
+    >
+      {authMessage ? <AuthMessage>{authMessage}</AuthMessage> : null}
+      <label className="auth-remember">
+        <input
+          type="checkbox"
+          checked={rememberMe}
+          onChange={(event) => setRememberMe(event.target.checked)}
+        />
+        <span>Remember me</span>
+      </label>
+      {SOCIAL_PROVIDERS.map((provider) => {
+        if (available[provider.id] === false) {
+          return null;
+        }
+        return (
+          <form
+            key={provider.id}
+            method="post"
+            action={`/auth/login/${provider.id}`}
+            className="auth-form"
+          >
+            <input type="hidden" name="returnUrl" value={returnUrl} />
+            <input
+              type="hidden"
+              name="__RequestVerificationToken"
+              value={csrfToken ?? ""}
+            />
+            <input
+              type="hidden"
+              name="rememberMe"
+              value={String(rememberMe)}
+            />
+            <SubmitButton
+              className={`auth-button ${provider.buttonClass}`}
+              disabled={socialDisabled}
+            >
+              Continue with {provider.label}
+            </SubmitButton>
+          </form>
+        );
+      })}
+      <div className="auth-divider" role="separator" aria-label="or" />
+
+      {mode === "sign-in" ? (
+        <form className="auth-form" onSubmit={handleLoginSubmit}>
+          <AuthField id="login-email" label="Email">
+            <input
+              id="login-email"
+              type="email"
+              name="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </AuthField>
+          <AuthField id="login-password" label="Password">
+            <input
+              id="login-password"
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </AuthField>
+          <p className="auth-toggle">
+            <a className="auth-toggle__button" href="/forgot-password">
+              Forgot password?
+            </a>
           </p>
-        ) : null}
-        <label className="auth-remember">
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(event) => setRememberMe(event.target.checked)}
+          {formError ? <AuthMessage>{formError}</AuthMessage> : null}
+          <SubmitButton pending={submitting} pendingLabel="Signing in…">
+            Sign in with email
+          </SubmitButton>
+        </form>
+      ) : (
+        <form className="auth-form" onSubmit={handleRegisterSubmit}>
+          <AuthField id="register-email" label="Email">
+            <input
+              id="register-email"
+              type="email"
+              name="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </AuthField>
+          <PasswordConfirmFields
+            passwordId="register-password"
+            passwordLabel="Password"
+            passwordValue={password}
+            onPasswordChange={setPassword}
+            confirmId="register-confirm"
+            confirmLabel="Confirm password"
+            confirmValue={confirmPassword}
+            onConfirmChange={setConfirmPassword}
           />
-          <span>Remember me</span>
-        </label>
-        {SOCIAL_PROVIDERS.map((provider) => {
-          if (available[provider.id] === false) {
-            return null;
-          }
-          return (
-            <form
-              key={provider.id}
-              method="post"
-              action={`/auth/login/${provider.id}`}
-              className="auth-form"
-            >
-              <input type="hidden" name="returnUrl" value={returnUrl} />
-              <input
-                type="hidden"
-                name="__RequestVerificationToken"
-                value={csrfToken ?? ""}
-              />
-              <input
-                type="hidden"
-                name="rememberMe"
-                value={String(rememberMe)}
-              />
-              <button
-                type="submit"
-                className={`auth-button ${provider.buttonClass}`}
-                disabled={socialDisabled}
-              >
-                Continue with {provider.label}
-              </button>
-            </form>
-          );
-        })}
-        <div className="auth-divider" role="separator" aria-label="or" />
+          {formError ? <AuthMessage>{formError}</AuthMessage> : null}
+          <SubmitButton pending={submitting} pendingLabel="Creating account…">
+            Create account
+          </SubmitButton>
+        </form>
+      )}
 
+      <p className="auth-toggle">
         {mode === "sign-in" ? (
-          <form className="auth-form" onSubmit={handleLoginSubmit}>
-            <div className="auth-field">
-              <label htmlFor="login-email">Email</label>
-              <input
-                id="login-email"
-                type="email"
-                name="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </div>
-            <div className="auth-field">
-              <label htmlFor="login-password">Password</label>
-              <input
-                id="login-password"
-                type="password"
-                name="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
-            <p className="auth-toggle">
-              <a className="auth-toggle__button" href="/forgot-password">
-                Forgot password?
-              </a>
-            </p>
-            {formError ? (
-              <p className="auth-message" role="alert">
-                {formError}
-              </p>
-            ) : null}
-            <button type="submit" className="auth-button" disabled={submitting}>
-              {submitting ? "Signing in…" : "Sign in with email"}
-            </button>
-          </form>
+          <button
+            type="button"
+            className="auth-toggle__button"
+            onClick={() => switchMode("create")}
+          >
+            Create account
+          </button>
         ) : (
-          <form className="auth-form" onSubmit={handleRegisterSubmit}>
-            <div className="auth-field">
-              <label htmlFor="register-email">Email</label>
-              <input
-                id="register-email"
-                type="email"
-                name="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </div>
-            <div className="auth-field">
-              <label htmlFor="register-password">Password</label>
-              <input
-                id="register-password"
-                type="password"
-                name="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
-            <div className="auth-field">
-              <label htmlFor="register-confirm">Confirm password</label>
-              <input
-                id="register-confirm"
-                type="password"
-                name="confirmPassword"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                required
-              />
-            </div>
-            {formError ? (
-              <p className="auth-message" role="alert">
-                {formError}
-              </p>
-            ) : null}
-            <button type="submit" className="auth-button" disabled={submitting}>
-              {submitting ? "Creating account…" : "Create account"}
-            </button>
-          </form>
+          <button
+            type="button"
+            className="auth-toggle__button"
+            onClick={() => switchMode("sign-in")}
+          >
+            Back to sign in
+          </button>
         )}
+      </p>
 
-        <p className="auth-toggle">
-          {mode === "sign-in" ? (
-            <button
-              type="button"
-              className="auth-toggle__button"
-              onClick={() => switchMode("create")}
-            >
-              Create account
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="auth-toggle__button"
-              onClick={() => switchMode("sign-in")}
-            >
-              Back to sign in
-            </button>
-          )}
-        </p>
-
-        <nav className="auth-links" aria-label="Legal and support">
-          <a href="#">Privacy</a>
-          <a href="#">Terms</a>
-          <a href="#">Support</a>
-        </nav>
-      </main>
-    </div>
+      <nav className="auth-links" aria-label="Legal and support">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Support</a>
+      </nav>
+    </AuthCard>
   );
 }

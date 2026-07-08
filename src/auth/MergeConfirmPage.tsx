@@ -6,6 +6,8 @@ import {
   getPendingMerge,
   type PendingMergeDetail,
 } from "./mergeApi";
+import { AuthCard } from "./ui/AuthCard";
+import { AuthMessage } from "./ui/AuthMessage";
 
 function labelProvider(provider: string): string {
   switch (provider) {
@@ -81,80 +83,63 @@ export function MergeConfirmPage() {
 
   if (loading) {
     return (
-      <div className="auth-shell">
-        <main className="auth-card" aria-labelledby="merge-confirm-title">
-          <h1 id="merge-confirm-title">Confirm account merge</h1>
-          <p className="auth-message" role="status">
-            Loading…
-          </p>
-        </main>
-      </div>
+      <AuthCard titleId="merge-confirm-title" title="Confirm account merge">
+        <AuthMessage role="status">Loading…</AuthMessage>
+      </AuthCard>
     );
   }
 
   if (!pending) {
     return (
-      <div className="auth-shell">
-        <main className="auth-card" aria-labelledby="merge-confirm-title">
-          <h1 id="merge-confirm-title">Confirm account merge</h1>
-          <p className="auth-message" role="status">
-            No pending account merge.
-          </p>
-          <p className="auth-toggle">
-            <a className="auth-toggle__button" href="/account-settings">
-              Back to account settings
-            </a>
-          </p>
-        </main>
-      </div>
+      <AuthCard titleId="merge-confirm-title" title="Confirm account merge">
+        <AuthMessage role="status">No pending account merge.</AuthMessage>
+        <p className="auth-toggle">
+          <a className="auth-toggle__button" href="/account-settings">
+            Back to account settings
+          </a>
+        </p>
+      </AuthCard>
     );
   }
 
   const providerLabel = labelProvider(pending.provider);
 
   return (
-    <div className="auth-shell">
-      <main className="auth-card" aria-labelledby="merge-confirm-title">
-        <h1 id="merge-confirm-title">Confirm account merge</h1>
-        <p className="auth-subtitle">
-          Merge {pending.secondaryDisplayName} into {pending.primaryDisplayName}?
-          The {providerLabel} login and any credentials will move to{" "}
-          {pending.primaryDisplayName}.
-        </p>
-        <ul className="auth-merge-accounts">
-          <li>
-            <strong>Primary:</strong> {pending.primaryDisplayName}
-            {pending.primaryEmail ? ` (${pending.primaryEmail})` : ""}
-          </li>
-          <li>
-            <strong>Secondary:</strong> {pending.secondaryDisplayName}
-            {pending.secondaryEmail ? ` (${pending.secondaryEmail})` : ""}
-          </li>
-        </ul>
-        {error ? (
-          <p className="auth-message" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <div className="auth-form-actions">
-          <button
-            type="button"
-            className="auth-button"
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
-            {submitting ? "Merging…" : "Confirm merge"}
-          </button>
-          <button
-            type="button"
-            className="auth-toggle__button"
-            onClick={handleCancel}
-            disabled={submitting}
-          >
-            Cancel
-          </button>
-        </div>
-      </main>
-    </div>
+    <AuthCard titleId="merge-confirm-title" title="Confirm account merge">
+      <p className="auth-subtitle">
+        Merge {pending.secondaryDisplayName} into {pending.primaryDisplayName}?
+        The {providerLabel} login and any credentials will move to{" "}
+        {pending.primaryDisplayName}.
+      </p>
+      <ul className="auth-merge-accounts">
+        <li>
+          <strong>Primary:</strong> {pending.primaryDisplayName}
+          {pending.primaryEmail ? ` (${pending.primaryEmail})` : ""}
+        </li>
+        <li>
+          <strong>Secondary:</strong> {pending.secondaryDisplayName}
+          {pending.secondaryEmail ? ` (${pending.secondaryEmail})` : ""}
+        </li>
+      </ul>
+      {error ? <AuthMessage>{error}</AuthMessage> : null}
+      <div className="auth-form-actions">
+        <button
+          type="button"
+          className="auth-button"
+          onClick={handleConfirm}
+          disabled={submitting}
+        >
+          {submitting ? "Merging…" : "Confirm merge"}
+        </button>
+        <button
+          type="button"
+          className="auth-toggle__button"
+          onClick={handleCancel}
+          disabled={submitting}
+        >
+          Cancel
+        </button>
+      </div>
+    </AuthCard>
   );
 }

@@ -9,6 +9,11 @@ import {
   unlinkProvider,
   type AccountDetail,
 } from "./sessionApi";
+import { AuthCard } from "./ui/AuthCard";
+import { AuthField } from "./ui/AuthField";
+import { AuthMessage } from "./ui/AuthMessage";
+import { PasswordConfirmFields } from "./ui/PasswordConfirmFields";
+import { SubmitButton } from "./ui/SubmitButton";
 
 const CHANGE_ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: "Your current password is incorrect.",
@@ -219,253 +224,189 @@ export function AccountSettingsPage() {
   }
 
   return (
-    <div className="auth-shell">
-      <main className="auth-card" aria-labelledby="account-settings-title">
-        <h1 id="account-settings-title">Account settings</h1>
-        <p className="auth-subtitle">
-          Manage how you sign in to Intervals.
-        </p>
+    <AuthCard
+      titleId="account-settings-title"
+      title="Account settings"
+      subtitle="Manage how you sign in to Intervals."
+    >
+      {loadError ? <AuthMessage>{loadError}</AuthMessage> : null}
 
-        {loadError ? (
-          <p className="auth-message" role="alert">
-            {loadError}
-          </p>
-        ) : null}
+      {status === "loading" || status === "idle" ? (
+        <AuthMessage role="status">Loading account details…</AuthMessage>
+      ) : null}
 
-        {status === "loading" || status === "idle" ? (
-          <p className="auth-message" role="status">
-            Loading account details…
-          </p>
-        ) : null}
+      {unlinkError ? <AuthMessage>{unlinkError}</AuthMessage> : null}
 
-        {unlinkError ? (
-          <p className="auth-message" role="alert">
-            {unlinkError}
-          </p>
-        ) : null}
-
-        {detail ? (
-          <section aria-labelledby="sign-in-methods-title">
-            <h2 id="sign-in-methods-title">Sign-in methods</h2>
-            <ul className="auth-providers">
-              {EXTERNAL_PROVIDERS.map((providerId) => {
-                const provider = detail.providers.find(
-                  (p) => p.id === providerId,
-                );
-                if (!provider) {
-                  return null;
-                }
-                return (
-                  <li key={providerId} className="auth-providers__item">
-                    <div>
-                      <span className="auth-providers__label">
-                        {provider.label}
-                      </span>
-                      <span className="auth-providers__status">
-                        {provider.linked
-                          ? provider.email
-                            ? `Linked · ${provider.email}`
-                            : "Linked"
+      {detail ? (
+        <section aria-labelledby="sign-in-methods-title">
+          <h2 id="sign-in-methods-title">Sign-in methods</h2>
+          <ul className="auth-providers">
+            {EXTERNAL_PROVIDERS.map((providerId) => {
+              const provider = detail.providers.find(
+                (p) => p.id === providerId,
+              );
+              if (!provider) {
+                return null;
+              }
+              return (
+                <li key={providerId} className="auth-providers__item">
+                  <div>
+                    <span className="auth-providers__label">
+                      {provider.label}
+                    </span>
+                    <span className="auth-providers__status">
+                      {provider.linked
+                        ? provider.email
+                          ? `Linked · ${provider.email}`
+                          : "Linked"
+                        : "Not linked"}
+                    </span>
+                  </div>
+                  {provider.linked ? (
+                    <button
+                      type="button"
+                      className="auth-button"
+                      disabled={unlinkBusy === providerId}
+                      onClick={() =>
+                        void handleUnlink(providerId, provider.label)
+                      }
+                    >
+                      {unlinkBusy === providerId
+                        ? "Unlinking…"
+                        : `Unlink ${provider.label}`}
+                    </button>
+                  ) : providerAvailability[providerId] !== false ? (
+                    <form
+                      method="post"
+                      action={`/auth/providers/link/${providerId}`}
+                      className="auth-form auth-form--inline"
+                    >
+                      <input
+                        type="hidden"
+                        name="returnUrl"
+                        value="/account-settings"
+                      />
+                      <input
+                        type="hidden"
+                        name="__RequestVerificationToken"
+                        value={csrfToken ?? ""}
+                      />
+                      <SubmitButton
+                        disabled={csrfLoading || csrfToken === null}
+                      >
+                        Link {provider.label}
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </li>
+              );
+            })}
+            {(() => {
+              const password = detail.providers.find(
+                (p) => p.id === "password",
+              );
+              if (!password) {
+                return null;
+              }
+              return (
+                <li className="auth-providers__item">
+                  <div>
+                    <span className="auth-providers__label">
+                      {password.label}
+                    </span>
+                    <span className="auth-providers__status">
+                      {password.linked && password.email
+                        ? `Linked · ${password.email}`
+                        : password.linked
+                          ? "Linked"
                           : "Not linked"}
-                      </span>
-                    </div>
-                    {provider.linked ? (
-                      <button
-                        type="button"
-                        className="auth-button"
-                        disabled={unlinkBusy === providerId}
-                        onClick={() =>
-                          void handleUnlink(providerId, provider.label)
-                        }
-                      >
-                        {unlinkBusy === providerId
-                          ? "Unlinking…"
-                          : `Unlink ${provider.label}`}
-                      </button>
-                    ) : providerAvailability[providerId] !== false ? (
-                      <form
-                        method="post"
-                        action={`/auth/providers/link/${providerId}`}
-                        className="auth-form auth-form--inline"
-                      >
-                        <input
-                          type="hidden"
-                          name="returnUrl"
-                          value="/account-settings"
-                        />
-                        <input
-                          type="hidden"
-                          name="__RequestVerificationToken"
-                          value={csrfToken ?? ""}
-                        />
-                        <button
-                          type="submit"
-                          className="auth-button"
-                          disabled={csrfLoading || csrfToken === null}
-                        >
-                          Link {provider.label}
-                        </button>
-                      </form>
-                    ) : null}
-                  </li>
-                );
-              })}
-              {(() => {
-                const password = detail.providers.find(
-                  (p) => p.id === "password",
-                );
-                if (!password) {
-                  return null;
-                }
-                return (
-                  <li className="auth-providers__item">
-                    <div>
-                      <span className="auth-providers__label">
-                        {password.label}
-                      </span>
-                      <span className="auth-providers__status">
-                        {password.linked && password.email
-                          ? `Linked · ${password.email}`
-                          : password.linked
-                            ? "Linked"
-                            : "Not linked"}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })()}
-            </ul>
-          </section>
-        ) : null}
+                    </span>
+                  </div>
+                </li>
+              );
+            })()}
+          </ul>
+        </section>
+      ) : null}
 
-        {detail?.hasPassword ? (
-          <section aria-labelledby="change-password-title">
-            <h2 id="change-password-title">Change password</h2>
-            {changeSuccess ? (
-              <p className="auth-message" role="status">
-                {changeSuccess}
-              </p>
-            ) : null}
-            <form className="auth-form" onSubmit={handleChangeSubmit}>
-              <div className="auth-field">
-                <label htmlFor="change-current">Current password</label>
-                <input
-                  id="change-current"
-                  type="password"
-                  name="currentPassword"
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(event) => setCurrentPassword(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="auth-field">
-                <label htmlFor="change-new">New password</label>
-                <input
-                  id="change-new"
-                  type="password"
-                  name="newPassword"
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="auth-field">
-                <label htmlFor="change-confirm">Confirm new password</label>
-                <input
-                  id="change-confirm"
-                  type="password"
-                  name="confirmPassword"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  required
-                />
-              </div>
-              {changeError ? (
-                <p className="auth-message" role="alert">
-                  {changeError}
-                </p>
-              ) : null}
-              <button
-                type="submit"
-                className="auth-button"
-                disabled={changeSubmitting}
-              >
-                {changeSubmitting ? "Updating…" : "Update password"}
-              </button>
-            </form>
-          </section>
-        ) : null}
+      {detail?.hasPassword ? (
+        <section aria-labelledby="change-password-title">
+          <h2 id="change-password-title">Change password</h2>
+          {changeSuccess ? (
+            <AuthMessage role="status">{changeSuccess}</AuthMessage>
+          ) : null}
+          <form className="auth-form" onSubmit={handleChangeSubmit}>
+            <AuthField id="change-current" label="Current password">
+              <input
+                id="change-current"
+                type="password"
+                name="currentPassword"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                required
+              />
+            </AuthField>
+            <PasswordConfirmFields
+              passwordId="change-new"
+              passwordLabel="New password"
+              passwordName="newPassword"
+              passwordValue={newPassword}
+              onPasswordChange={setNewPassword}
+              confirmId="change-confirm"
+              confirmLabel="Confirm new password"
+              confirmValue={confirmPassword}
+              onConfirmChange={setConfirmPassword}
+            />
+            {changeError ? <AuthMessage>{changeError}</AuthMessage> : null}
+            <SubmitButton pending={changeSubmitting} pendingLabel="Updating…">
+              Update password
+            </SubmitButton>
+          </form>
+        </section>
+      ) : null}
 
-        {detail && !detail.hasPassword ? (
-          <section aria-labelledby="add-password-title">
-            <h2 id="add-password-title">Add a password</h2>
-            {addSuccess ? (
-              <p className="auth-message" role="status">
-                {addSuccess}
-              </p>
-            ) : null}
-            <form className="auth-form" onSubmit={handleAddSubmit}>
-              <div className="auth-field">
-                <label htmlFor="add-email">Email</label>
-                <input
-                  id="add-email"
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  value={addEmail}
-                  onChange={(event) => setAddEmail(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="auth-field">
-                <label htmlFor="add-password">Password</label>
-                <input
-                  id="add-password"
-                  type="password"
-                  name="password"
-                  autoComplete="new-password"
-                  value={addPasswordValue}
-                  onChange={(event) => setAddPasswordValue(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="auth-field">
-                <label htmlFor="add-confirm">Confirm password</label>
-                <input
-                  id="add-confirm"
-                  type="password"
-                  name="confirmPassword"
-                  autoComplete="new-password"
-                  value={addConfirm}
-                  onChange={(event) => setAddConfirm(event.target.value)}
-                  required
-                />
-              </div>
-              {addError ? (
-                <p className="auth-message" role="alert">
-                  {addError}
-                </p>
-              ) : null}
-              <button
-                type="submit"
-                className="auth-button"
-                disabled={addSubmitting}
-              >
-                {addSubmitting ? "Adding…" : "Add password"}
-              </button>
-            </form>
-          </section>
-        ) : null}
+      {detail && !detail.hasPassword ? (
+        <section aria-labelledby="add-password-title">
+          <h2 id="add-password-title">Add a password</h2>
+          {addSuccess ? (
+            <AuthMessage role="status">{addSuccess}</AuthMessage>
+          ) : null}
+          <form className="auth-form" onSubmit={handleAddSubmit}>
+            <AuthField id="add-email" label="Email">
+              <input
+                id="add-email"
+                type="email"
+                name="email"
+                autoComplete="email"
+                value={addEmail}
+                onChange={(event) => setAddEmail(event.target.value)}
+                required
+              />
+            </AuthField>
+            <PasswordConfirmFields
+              passwordId="add-password"
+              passwordLabel="Password"
+              passwordValue={addPasswordValue}
+              onPasswordChange={setAddPasswordValue}
+              confirmId="add-confirm"
+              confirmLabel="Confirm password"
+              confirmValue={addConfirm}
+              onConfirmChange={setAddConfirm}
+            />
+            {addError ? <AuthMessage>{addError}</AuthMessage> : null}
+            <SubmitButton pending={addSubmitting} pendingLabel="Adding…">
+              Add password
+            </SubmitButton>
+          </form>
+        </section>
+      ) : null}
 
-        <p className="auth-toggle">
-          <a className="auth-toggle__button" href="/">
-            Back to app
-          </a>
-        </p>
-      </main>
-    </div>
+      <p className="auth-toggle">
+        <a className="auth-toggle__button" href="/">
+          Back to app
+        </a>
+      </p>
+    </AuthCard>
   );
 }

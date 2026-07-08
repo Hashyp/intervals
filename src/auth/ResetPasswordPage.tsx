@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AuthApiError, resetPassword } from "./sessionApi";
+import { AuthCard } from "./ui/AuthCard";
+import { AuthMessage } from "./ui/AuthMessage";
+import { PasswordConfirmFields } from "./ui/PasswordConfirmFields";
+import { SubmitButton } from "./ui/SubmitButton";
 
 const RESET_ERROR_MESSAGES: Record<string, string> = {
   weak_password: "Please choose a stronger password (at least 8 characters).",
@@ -36,19 +40,14 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="auth-shell">
-        <main className="auth-card" aria-labelledby="reset-password-title">
-          <h1 id="reset-password-title">Set a new password</h1>
-          <p className="auth-message" role="alert">
-            Invalid reset link.
-          </p>
-          <p className="auth-toggle">
-            <a className="auth-toggle__button" href="/forgot-password">
-              Request a new reset link
-            </a>
-          </p>
-        </main>
-      </div>
+      <AuthCard titleId="reset-password-title" title="Set a new password">
+        <AuthMessage>Invalid reset link.</AuthMessage>
+        <p className="auth-toggle">
+          <a className="auth-toggle__button" href="/forgot-password">
+            Request a new reset link
+          </a>
+        </p>
+      </AuthCard>
     );
   }
 
@@ -82,61 +81,36 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="auth-shell">
-      <main className="auth-card" aria-labelledby="reset-password-title">
-        <h1 id="reset-password-title">Set a new password</h1>
-        {succeeded ? (
-          <>
-            <p className="auth-message" role="status">
-              Your password has been reset. You can now sign in.
-            </p>
-            <p className="auth-toggle">
-              <a className="auth-toggle__button" href="/login">
-                Back to sign in
-              </a>
-            </p>
-          </>
-        ) : (
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <div className="auth-field">
-              <label htmlFor="reset-password">New password</label>
-              <input
-                id="reset-password"
-                type="password"
-                name="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
-            <div className="auth-field">
-              <label htmlFor="reset-confirm">Confirm password</label>
-              <input
-                id="reset-confirm"
-                type="password"
-                name="confirmPassword"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                required
-              />
-            </div>
-            {formError ? (
-              <p className="auth-message" role="alert">
-                {formError}
-              </p>
-            ) : null}
-            <button
-              type="submit"
-              className="auth-button"
-              disabled={submitting}
-            >
-              {submitting ? "Resetting…" : "Reset password"}
-            </button>
-          </form>
-        )}
-      </main>
-    </div>
+    <AuthCard titleId="reset-password-title" title="Set a new password">
+      {succeeded ? (
+        <>
+          <AuthMessage role="status">
+            Your password has been reset. You can now sign in.
+          </AuthMessage>
+          <p className="auth-toggle">
+            <a className="auth-toggle__button" href="/login">
+              Back to sign in
+            </a>
+          </p>
+        </>
+      ) : (
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <PasswordConfirmFields
+            passwordId="reset-password"
+            passwordLabel="New password"
+            passwordValue={password}
+            onPasswordChange={setPassword}
+            confirmId="reset-confirm"
+            confirmLabel="Confirm password"
+            confirmValue={confirmPassword}
+            onConfirmChange={setConfirmPassword}
+          />
+          {formError ? <AuthMessage>{formError}</AuthMessage> : null}
+          <SubmitButton pending={submitting} pendingLabel="Resetting…">
+            Reset password
+          </SubmitButton>
+        </form>
+      )}
+    </AuthCard>
   );
 }
