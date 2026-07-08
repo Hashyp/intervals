@@ -5,6 +5,7 @@ import {
   AuthApiError,
   changePassword,
   getAccount,
+  getAntiforgeryToken,
   unlinkProvider,
   type AccountDetail,
 } from "./sessionApi";
@@ -51,6 +52,12 @@ export function AccountSettingsPage() {
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [unlinkBusy, setUnlinkBusy] = useState<string | null>(null);
 
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
+  const [csrfLoading, setCsrfLoading] = useState(true);
+  const [providerAvailability, setProviderAvailability] = useState<
+    Record<string, boolean>
+  >({});
+
   async function loadDetail() {
     setStatus("loading");
     setLoadError(null);
@@ -71,6 +78,47 @@ export function AccountSettingsPage() {
   useEffect(() => {
     void loadDetail();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCsrfLoading(true);
+    getAntiforgeryToken()
+      .then((token) => {
+        if (!cancelled) {
+          setCsrfToken(token);
+        }
+      })
+      .catch(() => {
+        // Leave token null; link buttons stay disabled.
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCsrfLoading(false);
+        }
+      });
+    fetch("/api/auth/providers", { credentials: "same-origin" })
+      .then((response) =>
+        response.ok ? response.json() : Promise.reject(new Error("providers")),
+      )
+      .then((data: { providers?: { id: string; available: boolean }[] }) => {
+        if (cancelled || !data.providers) {
+          return;
+        }
+        const map: Record<string, boolean> = {};
+        for (const p of data.providers) {
+          map[p.id] = p.available;
+        }
+        if (!cancelled) {
+          setProviderAvailability(map);
+        }
+      })
+      .catch(() => {
+        // Fail open: an empty map treats every provider as available.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleChangeSubmit(event: FormEvent<HTMLFormElement>) {
@@ -234,7 +282,7 @@ export function AccountSettingsPage() {
                           ? "Unlinking…"
                           : `Unlink ${provider.label}`}
                       </button>
-                    ) : (
+                    ) : providerAvailability[providerId] !== false ? (
                       <form
                         method="post"
                         action={`/auth/providers/link/${providerId}`}
@@ -245,11 +293,20 @@ export function AccountSettingsPage() {
                           name="returnUrl"
                           value="/account-settings"
                         />
-                        <button type="submit" className="auth-button">
+                        <input
+                          type="hidden"
+                          name="__RequestVerificationToken"
+                          value={csrfToken ?? ""}
+                        />
+                        <button
+                          type="submit"
+                          className="auth-button"
+                          disabled={csrfLoading || csrfToken === null}
+                        >
                           Link {provider.label}
                         </button>
                       </form>
-                    )}
+                    ) : null}
                   </li>
                 );
               })}

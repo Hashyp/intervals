@@ -1276,3 +1276,125 @@ h2 {
   font: inherit;
 }
 .account-bar__signout:hover { border-color: var(--accent); }
+
+/* Provider list (sign-in methods) */
+.auth-providers {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.auth-providers__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.auth-providers__item > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.auth-providers__label {
+  font-weight: 600;
+  color: var(--ink);
+}
+.auth-providers__status {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Inline (single-button) form variant */
+.auth-form--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.auth-form--inline .auth-button {
+  width: auto;
+}
+
+/* Row of action buttons */
+.auth-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 12px;
+}
+.auth-form-actions .auth-button {
+  width: auto;
+}
+
+/* Merge-confirm accounts list */
+.auth-merge-accounts {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+/* Email-verification banner in the account bar */
+.account-bar__verify {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 0.85rem;
+}
+.account-bar__verify-text {
+  color: var(--ink-soft);
+}
+.account-bar__verify-button {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+.account-bar__verify-button:hover {
+  border-color: var(--accent);
+}
+.account-bar__verify-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.account-bar__verify-error {
+  color: var(--wrong-deep);
+}
+
+/* Keyboard focus rings for auth surfaces */
+.auth-button:focus-visible,
+.auth-toggle__button:focus-visible,
+.auth-links a:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent);
+  border-radius: var(--r-sm);
+}
+.account-bar a:focus-visible,
+.account-bar__signout:focus-visible,
+.account-bar__verify-button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--bg-warm),
+    0 0 0 4px var(--accent);
+  border-radius: var(--r-sm);
+}

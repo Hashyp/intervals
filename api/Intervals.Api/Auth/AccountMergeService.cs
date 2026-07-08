@@ -14,6 +14,7 @@ namespace Intervals.Api.Auth;
 public sealed class AccountMergeService(
     IntervalsDbContext db,
     IDataProtectionProvider dataProtection,
+    TimeProvider timeProvider,
     ILogger<AccountMergeService> logger) : IAccountMergeService
 {
     public const string CookieName = "Intervals.PendingMerge";
@@ -143,7 +144,8 @@ public sealed class AccountMergeService(
 
     public void SetPendingMerge(HttpContext httpContext, Guid primaryUserId, Guid secondaryUserId, string provider)
     {
-        var payload = $"{primaryUserId}:{secondaryUserId}:{provider}";
+        var expiresAt = timeProvider.GetUtcNow().Add(PendingLifetime);
+        var payload = $"{primaryUserId}:{secondaryUserId}:{provider}:{expiresAt.UtcTicks}";
         var protectedValue = _protector.Protect(payload);
         httpContext.Response.Cookies.Append(CookieName, protectedValue, new CookieOptions
         {
@@ -168,8 +170,10 @@ public sealed class AccountMergeService(
         }
 
         // The pending-merge cookie is client-settable, so it must be authenticated:
-        // an attacker cannot forge a primary:secondary:provider payload without the
-        // data-protection key. Tampered or unsigned values are treated as absent.
+        // an attacker cannot forge a primary:secondary:provider:expiresAt payload
+        // without the data-protection key, and cannot replay an expired payload
+        // past the embedded server-validated expiry. Tampered or unsigned values
+        // are treated as absent.
         string payload;
         try
         {
@@ -181,12 +185,26 @@ public sealed class AccountMergeService(
         }
 
         var segments = payload.Split(':');
-        if (segments.Length != 3)
+        // Require EXACTLY 4 segments (primary:secondary:provider:expiresAtTicks).
+        // Legacy 3-segment payloads (no embedded expiry) are rejected as invalid
+        // so a client cannot strip the server-validated expiration.
+        if (segments.Length != 4)
         {
             return (null, null, null);
         }
 
         if (!Guid.TryParse(segments[0], out var primary) || !Guid.TryParse(segments[1], out var secondary))
+        {
+            return (null, null, null);
+        }
+
+        if (!long.TryParse(segments[3], out var expiresAtTicks))
+        {
+            return (null, null, null);
+        }
+
+        var now = timeProvider.GetUtcNow();
+        if (now.UtcTicks >= expiresAtTicks)
         {
             return (null, null, null);
         }

@@ -64,6 +64,32 @@ describe("ResetPasswordPage", () => {
     expect(resetPassword).toHaveBeenCalledWith("valid-token", "brand-new-pw-7");
   });
 
+  it("scrubs the token from the url on mount but keeps it for submission", async () => {
+    resetPassword.mockResolvedValue(undefined);
+    window.history.replaceState({}, "", "/reset-password?token=abc");
+    const replaceSpy = vi.spyOn(window.history, "replaceState");
+
+    render(<ResetPasswordPage />);
+
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalled());
+    expect(window.location.search).not.toContain("token");
+    expect(window.location.href).not.toContain("token=");
+
+    fireEvent.change(screen.getByLabelText(/^new password$/i), {
+      target: { value: "brand-new-pw-7" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "brand-new-pw-7" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /reset password/i }),
+    );
+
+    await waitFor(() =>
+      expect(resetPassword).toHaveBeenCalledWith("abc", "brand-new-pw-7"),
+    );
+  });
+
   it("shows the success message when reset resolves", async () => {
     resetPassword.mockResolvedValue(undefined);
 

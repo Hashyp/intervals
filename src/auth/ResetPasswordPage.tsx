@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AuthApiError, resetPassword } from "./sessionApi";
 
 const RESET_ERROR_MESSAGES: Record<string, string> = {
@@ -21,6 +21,18 @@ export function ResetPasswordPage() {
   const [submitting, setSubmitting] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("token")) {
+      return;
+    }
+    url.searchParams.delete("token");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  }, []);
 
   if (!token) {
     return (

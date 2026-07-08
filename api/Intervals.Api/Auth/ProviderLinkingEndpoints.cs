@@ -30,22 +30,34 @@ public static class ProviderLinkingEndpoints
 
         var group = app.MapGroup("/auth/providers");
 
-        group.MapPost("/link/{provider}", async (string provider, HttpContext context) =>
+        group.MapPost("/link/{provider}", async (string provider, HttpContext context, IAntiforgery antiforgery) =>
         {
+            try
+            {
+                await antiforgery.ValidateRequestAsync(context);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                return Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Antiforgery validation failed.",
+                    context.GetCorrelationId()));
+            }
+
             var authOptions = context.RequestServices.GetRequiredService<IOptions<AuthOptions>>().Value;
             var normalized = AuthProviderNames.Normalize(provider);
 
             if (!AuthProviderNames.IsValid(normalized))
             {
                 context.Response.Redirect(AuthRedirect.Build(webBaseUrl, "/account-settings", AuthResultCodes.Unknown));
-                return;
+                return Results.Empty;
             }
 
             var userId = CurrentUser.GetUserId(context.User);
             if (userId is null)
             {
                 context.Response.Redirect(AuthRedirect.Build(webBaseUrl, authOptions.LoginPath, AuthResultCodes.AuthRequired));
-                return;
+                return Results.Empty;
             }
 
             var scheme = AuthProviderNames.ToScheme(normalized);
@@ -53,7 +65,7 @@ public static class ProviderLinkingEndpoints
             if (scheme is null || await schemeProvider.GetSchemeAsync(scheme) is null)
             {
                 context.Response.Redirect(AuthRedirect.Build(webBaseUrl, "/account-settings", AuthResultCodes.Unknown));
-                return;
+                return Results.Empty;
             }
 
             var form = await context.Request.ReadFormAsync(context.RequestAborted);
@@ -68,6 +80,7 @@ public static class ProviderLinkingEndpoints
             properties.Items["returnUrl"] = returnUrl;
 
             await context.ChallengeAsync(scheme, properties);
+            return Results.Empty;
         }).RequireAuthorization().RateLimit();
 
         group.MapGet("/complete/{provider}", async (

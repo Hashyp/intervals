@@ -1,7 +1,8 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "./AuthProvider";
 import {
   AuthApiError,
+  getAntiforgeryToken,
   loginWithPassword,
   register,
 } from "./sessionApi";
@@ -31,6 +32,24 @@ const REGISTER_ERROR_MESSAGES: Record<string, string> = {
 
 type Mode = "sign-in" | "create";
 
+type SocialProvider = {
+  id: "google" | "microsoft" | "x";
+  label: string;
+  buttonClass: string;
+};
+
+const SOCIAL_PROVIDERS: readonly SocialProvider[] = [
+  { id: "google", label: "Google", buttonClass: "auth-button--google" },
+  { id: "microsoft", label: "Microsoft", buttonClass: "auth-button--microsoft" },
+  { id: "x", label: "X", buttonClass: "auth-button--x" },
+];
+
+const DEFAULT_PROVIDER_AVAILABILITY: Record<string, boolean> = {
+  google: true,
+  microsoft: true,
+  x: true,
+};
+
 export function LoginPage() {
   const returnUrl = useMemo(() => currentReturnUrl(), []);
   const { refreshSession } = useAuth();
@@ -42,6 +61,11 @@ export function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
+  const [csrfLoading, setCsrfLoading] = useState(true);
+  const [available, setAvailable] = useState<Record<string, boolean>>(
+    DEFAULT_PROVIDER_AVAILABILITY,
+  );
 
   const authMessage = useMemo(() => {
     if (typeof window === "undefined") {
@@ -51,6 +75,33 @@ export function LoginPage() {
     const code = params.get("auth");
     return code && ERROR_MESSAGES[code] ? ERROR_MESSAGES[code] : null;
   }, []);
+
+  useEffect(() => {
+    getAntiforgeryToken()
+      .then((token) => setCsrfToken(token))
+      .catch(() => setCsrfToken(null))
+      .finally(() => setCsrfLoading(false));
+    fetch("/api/auth/providers")
+      .then((response) => (response.ok ? response.json() : null))
+      .then(
+        (data: {
+          providers?: Array<{ id: string; available: boolean }>;
+        } | null) => {
+          if (data?.providers) {
+            setAvailable(
+              Object.fromEntries(
+                data.providers.map((p) => [p.id, p.available] as const),
+              ),
+            );
+          }
+        },
+      )
+      .catch(() => {
+        // Fail open: keep all providers available when availability is unknown.
+      });
+  }, []);
+
+  const socialDisabled = csrfLoading || !csrfToken;
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -126,43 +177,46 @@ export function LoginPage() {
             {authMessage}
           </p>
         ) : null}
-        <form method="post" action="/auth/login/google" className="auth-form">
-          <input type="hidden" name="returnUrl" value={returnUrl} />
-          <label className="auth-remember">
-            <input
-              type="checkbox"
-              name="rememberMe"
-              value="true"
-              defaultChecked={false}
-            />
-            <span>Remember me</span>
-          </label>
-          <button type="submit" className="auth-button auth-button--google">
-            Continue with Google
-          </button>
-        </form>
-        <form method="post" action="/auth/login/microsoft" className="auth-form">
-          <input type="hidden" name="returnUrl" value={returnUrl} />
-          <label className="auth-remember">
-            <input
-              type="checkbox"
-              name="rememberMe"
-              value="true"
-              defaultChecked={false}
-            />
-            <span>Remember me</span>
-          </label>
-          <button type="submit" className="auth-button auth-button--microsoft">
-            Continue with Microsoft
-          </button>
-        </form>
-        <form method="post" action="/auth/login/x" className="auth-form">
-          <input type="hidden" name="returnUrl" value={returnUrl} />
-          <input type="hidden" name="rememberMe" value="false" />
-          <button type="submit" className="auth-button auth-button--x">
-            Continue with X
-          </button>
-        </form>
+        <label className="auth-remember">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(event) => setRememberMe(event.target.checked)}
+          />
+          <span>Remember me</span>
+        </label>
+        {SOCIAL_PROVIDERS.map((provider) => {
+          if (available[provider.id] === false) {
+            return null;
+          }
+          return (
+            <form
+              key={provider.id}
+              method="post"
+              action={`/auth/login/${provider.id}`}
+              className="auth-form"
+            >
+              <input type="hidden" name="returnUrl" value={returnUrl} />
+              <input
+                type="hidden"
+                name="__RequestVerificationToken"
+                value={csrfToken ?? ""}
+              />
+              <input
+                type="hidden"
+                name="rememberMe"
+                value={String(rememberMe)}
+              />
+              <button
+                type="submit"
+                className={`auth-button ${provider.buttonClass}`}
+                disabled={socialDisabled}
+              >
+                Continue with {provider.label}
+              </button>
+            </form>
+          );
+        })}
         <div className="auth-divider" role="separator" aria-label="or" />
 
         {mode === "sign-in" ? (
@@ -196,14 +250,6 @@ export function LoginPage() {
                 Forgot password?
               </a>
             </p>
-            <label className="auth-remember">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(event) => setRememberMe(event.target.checked)}
-              />
-              <span>Remember me</span>
-            </label>
             {formError ? (
               <p className="auth-message" role="alert">
                 {formError}

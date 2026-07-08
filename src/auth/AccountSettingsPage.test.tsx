@@ -6,14 +6,19 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getAccount, changePassword, addPassword, unlinkProvider } = vi.hoisted(
-  () => ({
-    getAccount: vi.fn(),
-    changePassword: vi.fn(),
-    addPassword: vi.fn(),
-    unlinkProvider: vi.fn(),
-  }),
-);
+const {
+  getAccount,
+  changePassword,
+  addPassword,
+  unlinkProvider,
+  getAntiforgeryToken,
+} = vi.hoisted(() => ({
+  getAccount: vi.fn(),
+  changePassword: vi.fn(),
+  addPassword: vi.fn(),
+  unlinkProvider: vi.fn(),
+  getAntiforgeryToken: vi.fn(),
+}));
 
 const refreshSession = vi.fn();
 
@@ -31,6 +36,7 @@ vi.mock("./sessionApi", () => ({
   changePassword,
   addPassword,
   unlinkProvider,
+  getAntiforgeryToken,
 }));
 
 vi.mock("./AuthProvider", () => ({
@@ -79,11 +85,19 @@ describe("AccountSettingsPage", () => {
     changePassword.mockReset();
     addPassword.mockReset();
     unlinkProvider.mockReset();
+    getAntiforgeryToken.mockReset();
     refreshSession.mockReset();
     refreshSession.mockResolvedValue(undefined);
+    getAntiforgeryToken.mockResolvedValue("test-csrf-token");
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json({ token: "tok" })),
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/auth/providers")) {
+          return Response.json({ providers: [] });
+        }
+        return Response.json({ token: "tok" });
+      }),
     );
   });
   afterEach(() => {
@@ -109,16 +123,62 @@ describe("AccountSettingsPage", () => {
     expect(microsoftLinkForm.querySelector('input[name="returnUrl"]')).toHaveValue(
       "/account-settings",
     );
+    expect(
+      microsoftLinkForm.querySelector('input[name="__RequestVerificationToken"]'),
+    ).toHaveValue("test-csrf-token");
 
     const xLinkForm = document.querySelector(
       'form[action="/auth/providers/link/x"]',
     ) as HTMLFormElement;
     expect(xLinkForm).toBeTruthy();
+    expect(
+      xLinkForm.querySelector('input[name="__RequestVerificationToken"]'),
+    ).toHaveValue("test-csrf-token");
 
     // Google is linked, so no link form should exist for it.
     expect(
       document.querySelector('form[action="/auth/providers/link/google"]'),
     ).toBeNull();
+  });
+
+  it("does not render a link button for an unavailable provider", async () => {
+    getAccount.mockResolvedValue(accountWithoutPassword);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/auth/providers")) {
+          return Response.json({
+            providers: [
+              { id: "google", available: true },
+              { id: "microsoft", available: false },
+              { id: "x", available: true },
+            ],
+          });
+        }
+        return Response.json({ token: "tok" });
+      }),
+    );
+
+    render(<AccountSettingsPage />);
+
+    expect(await screen.findByText(/sign-in methods/i)).toBeInTheDocument();
+
+    // Microsoft is unavailable: no link form/button.
+    await waitFor(() => {
+      expect(
+        document.querySelector('form[action="/auth/providers/link/microsoft"]'),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /link microsoft/i }),
+      ).toBeNull();
+    });
+
+    // X is available: link form still present.
+    const xLinkForm = document.querySelector(
+      'form[action="/auth/providers/link/x"]',
+    ) as HTMLFormElement;
+    expect(xLinkForm).toBeTruthy();
   });
 
   it("shows an unlink button for linked providers", async () => {

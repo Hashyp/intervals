@@ -72,11 +72,110 @@ describe("LoginPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/cancelled/i);
   });
 
-  it("includes a remember me checkbox", () => {
+  it("renders exactly one shared remember-me checkbox", () => {
     render(<LoginPage />);
-    const checkboxes = screen.getAllByLabelText(/remember me/i);
-    expect(checkboxes.length).toBeGreaterThanOrEqual(1);
+    const checkboxes = screen.getAllByRole("checkbox", {
+      name: /remember me/i,
+    });
+    expect(checkboxes).toHaveLength(1);
     expect(checkboxes[0]).toBeInTheDocument();
+  });
+
+  it("includes an antiforgery token and rememberMe field in each provider form", async () => {
+    mockAuthFetch({
+      "/auth/antiforgery-token": () => Response.json({ token: "csrf-abc" }),
+      "/api/auth/providers": () =>
+        Response.json({
+          providers: [
+            { id: "google", available: true },
+            { id: "microsoft", available: true },
+            { id: "x", available: true },
+          ],
+        }),
+    });
+
+    render(<LoginPage />);
+
+    await waitFor(() => {
+      const tokens = document.querySelectorAll(
+        'input[name="__RequestVerificationToken"]',
+      );
+      expect(tokens).toHaveLength(3);
+      tokens.forEach((node) => {
+        expect((node as HTMLInputElement).value).toBe("csrf-abc");
+      });
+    });
+
+    for (const id of ["google", "microsoft", "x"]) {
+      const remember = document.querySelector(
+        `form[action="/auth/login/${id}"] input[name="rememberMe"]`,
+      ) as HTMLInputElement;
+      expect(remember).not.toBeNull();
+      expect(remember.value).toBe("false");
+    }
+  });
+
+  it("reflects the shared remember-me state across provider hidden fields", async () => {
+    mockAuthFetch({
+      "/auth/antiforgery-token": () => Response.json({ token: "csrf-abc" }),
+      "/api/auth/providers": () =>
+        Response.json({
+          providers: [
+            { id: "google", available: true },
+            { id: "microsoft", available: true },
+            { id: "x", available: true },
+          ],
+        }),
+    });
+
+    render(<LoginPage />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /continue with google/i }),
+      ).not.toBeDisabled(),
+    );
+
+    const googleRemember = document.querySelector(
+      'form[action="/auth/login/google"] input[name="rememberMe"]',
+    ) as HTMLInputElement;
+    const xRemember = document.querySelector(
+      'form[action="/auth/login/x"] input[name="rememberMe"]',
+    ) as HTMLInputElement;
+    expect(googleRemember.value).toBe("false");
+    expect(xRemember.value).toBe("false");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /remember me/i }));
+
+    expect(googleRemember.value).toBe("true");
+    expect(xRemember.value).toBe("true");
+  });
+
+  it("hides providers reported as unavailable", async () => {
+    mockAuthFetch({
+      "/auth/antiforgery-token": () => Response.json({ token: "csrf-abc" }),
+      "/api/auth/providers": () =>
+        Response.json({
+          providers: [
+            { id: "google", available: true },
+            { id: "microsoft", available: true },
+            { id: "x", available: false },
+          ],
+        }),
+    });
+
+    render(<LoginPage />);
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('form[action="/auth/login/x"]'),
+      ).toBeNull();
+    });
+    expect(
+      document.querySelector('form[action="/auth/login/google"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('form[action="/auth/login/microsoft"]'),
+    ).not.toBeNull();
   });
 
   it("renders the password sign-in form", () => {

@@ -29,15 +29,27 @@ public static class AuthEndpoints
 
         var group = app.MapGroup("/auth");
 
-        group.MapPost("/login/{provider}", async (string provider, HttpContext context) =>
+        group.MapPost("/login/{provider}", async (string provider, HttpContext context, IAntiforgery antiforgery) =>
         {
+            try
+            {
+                await antiforgery.ValidateRequestAsync(context);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                return Results.BadRequest(new ApiError(
+                    AuthResultCodes.InvalidRequest,
+                    "Antiforgery validation failed.",
+                    context.GetCorrelationId()));
+            }
+
             var authOptions = context.RequestServices.GetRequiredService<IOptions<AuthOptions>>().Value;
             var normalized = AuthProviderNames.Normalize(provider);
 
             if (!AuthProviderNames.IsValid(normalized))
             {
                 context.Response.Redirect(AuthRedirect.Build(webBaseUrl, authOptions.LoginPath, AuthResultCodes.Unknown));
-                return;
+                return Results.Empty;
             }
 
             var form = await context.Request.ReadFormAsync(context.RequestAborted);
@@ -49,7 +61,7 @@ public static class AuthEndpoints
             if (scheme is null || await schemeProvider.GetSchemeAsync(scheme) is null)
             {
                 context.Response.Redirect(AuthRedirect.Build(webBaseUrl, authOptions.LoginPath, AuthResultCodes.Unknown));
-                return;
+                return Results.Empty;
             }
 
             var properties = new AuthenticationProperties
@@ -61,6 +73,7 @@ public static class AuthEndpoints
             properties.Items["provider"] = normalized;
 
             await context.ChallengeAsync(scheme, properties);
+            return Results.Empty;
         }).AllowAnonymous().RateLimit();
 
         group.MapPost("/login/password", async (
@@ -294,6 +307,21 @@ public static class AuthEndpoints
         {
             var tokens = antiforgery.GetAndStoreTokens(context);
             return Results.Json(new { token = tokens.RequestToken });
+        }).AllowAnonymous();
+
+        app.MapGet("/api/auth/providers", async (IAuthenticationSchemeProvider schemeProvider) =>
+        {
+            var schemes = await schemeProvider.GetAllSchemesAsync();
+            var names = schemes.Select(s => s.Name).ToHashSet();
+            return Results.Ok(new
+            {
+                providers = new[]
+                {
+                    new { id = AuthProviderNames.Google, available = names.Contains(AuthProviderNames.GoogleScheme) },
+                    new { id = AuthProviderNames.Microsoft, available = names.Contains(AuthProviderNames.MicrosoftScheme) },
+                    new { id = AuthProviderNames.X, available = names.Contains(AuthProviderNames.XScheme) },
+                },
+            });
         }).AllowAnonymous();
 
         app.MapGet("/api/session", async (

@@ -36,17 +36,8 @@ export function EmailVerificationBanner({
   };
 
   return (
-    <span
-      className="account-bar__verify"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "8px",
-        marginRight: "auto",
-        fontSize: "0.85rem",
-      }}
-    >
-      <span>
+    <span className="account-bar__verify">
+      <span className="account-bar__verify-text">
         {sent
           ? "Verification email sent."
           : "Your email isn't verified yet."}
@@ -54,23 +45,15 @@ export function EmailVerificationBanner({
       {!sent && (
         <button
           type="button"
+          className="account-bar__verify-button"
           onClick={() => void handleResend()}
           disabled={sending}
-          style={{
-            background: "transparent",
-            border: "1px solid var(--line-strong, #ccc)",
-            color: "var(--ink, inherit)",
-            borderRadius: "var(--r-sm, 4px)",
-            padding: "4px 10px",
-            cursor: sending ? "default" : "pointer",
-            font: "inherit",
-          }}
         >
           {sending ? "Sending..." : "Resend verification email"}
         </button>
       )}
       {error && (
-        <span role="alert" style={{ color: "var(--wrong-deep, #b00020)" }}>
+        <span className="account-bar__verify-error" role="alert">
           Try again.
         </span>
       )}

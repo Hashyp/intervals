@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 using Intervals.Api.Auth;
 using Intervals.Api.Data;
 using Intervals.Api.Data.Entities;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Intervals.Api.Tests;
@@ -386,5 +388,126 @@ public sealed class ProviderLinkingIntegrationTests
         var resp = await client.GetAsync("/auth/providers/pending-merge");
 
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    private static AccountMergeService ResolveWithClock(AuthWebFactory factory, TimeProvider clock, out IServiceScope scope, out IntervalsDbContext db)
+    {
+        scope = factory.Services.CreateScope();
+        db = scope.ServiceProvider.GetRequiredService<IntervalsDbContext>();
+        var dp = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<AccountMergeService>>();
+        return new AccountMergeService(db, dp, clock, logger);
+    }
+
+    [Fact]
+    public async Task PendingMerge_expiresServerSide()
+    {
+        await _factory.ResetDatabaseAsync();
+        var primary = NewUser("Primary", "primary@example.com", securityStamp: "primary-stamp");
+        var secondary = NewUser("Secondary", "secondary@example.com");
+        secondary.ExternalLogins.Add(NewExternal(secondary.Id, "google", "google-sec", "secondary@example.com"));
+        await SeedAsync(primary, secondary);
+
+        var clock = new FakeTimeProvider();
+        var merge = ResolveWithClock(_factory, clock, out var scope, out var db);
+        await using var _db = db;
+        using var _ = scope;
+
+        var context = NewHttpContext();
+        merge.SetPendingMerge(context, primary.Id, secondary.Id, "google");
+        RoundTripCookies(context);
+
+        // Advance the server clock PAST the 10-minute pending lifetime.
+        clock.Advance(TimeSpan.FromMinutes(11));
+
+        var detail = await merge.GetPendingMergeAsync(primary.Id, context);
+        Assert.Null(detail);
+
+        var ok = await merge.MergeAsync(primary.Id, context, correlationId: null);
+        Assert.False(ok);
+
+        // No merge occurred: the secondary account is untouched.
+        var refreshedSecondary = await db.AppUsers.AsNoTracking().FirstAsync(u => u.Id == secondary.Id);
+        Assert.Null(refreshedSecondary.MergedIntoUserId);
+        Assert.Null(refreshedSecondary.DisabledUtc);
+
+        var external = await db.ExternalLogins.AsNoTracking()
+            .FirstAsync(e => e.Provider == "google" && e.ProviderUserId == "google-sec");
+        Assert.Equal(secondary.Id, external.UserId);
+
+        var refreshedPrimary = await db.AppUsers.AsNoTracking().FirstAsync(u => u.Id == primary.Id);
+        Assert.Equal("primary-stamp", refreshedPrimary.SecurityStamp);
+    }
+
+    [Fact]
+    public async Task PendingMerge_validWithinWindow()
+    {
+        await _factory.ResetDatabaseAsync();
+        var primary = NewUser("Primary", "primary@example.com", securityStamp: "old-stamp");
+        var secondary = NewUser("Secondary", "secondary@example.com");
+        secondary.ExternalLogins.Add(NewExternal(secondary.Id, "google", "google-sec", "secondary@example.com"));
+        await SeedAsync(primary, secondary);
+
+        var clock = new FakeTimeProvider();
+        var merge = ResolveWithClock(_factory, clock, out var scope, out var db);
+        await using var _db = db;
+        using var _ = scope;
+
+        var context = NewHttpContext();
+        merge.SetPendingMerge(context, primary.Id, secondary.Id, "google");
+        RoundTripCookies(context);
+
+        // Advance only 1 minute — well within the 10-minute pending lifetime.
+        clock.Advance(TimeSpan.FromMinutes(1));
+
+        var detail = await merge.GetPendingMergeAsync(primary.Id, context);
+        Assert.NotNull(detail);
+        Assert.Equal(primary.Id, detail!.PrimaryUserId);
+        Assert.Equal(secondary.Id, detail.SecondaryUserId);
+        Assert.Equal("google", detail.Provider);
+
+        var ok = await merge.MergeAsync(primary.Id, context, correlationId: null);
+        Assert.True(ok);
+
+        var mergedSecondary = await db.AppUsers.FirstAsync(u => u.Id == secondary.Id);
+        Assert.Equal(primary.Id, mergedSecondary.MergedIntoUserId);
+    }
+
+    [Fact]
+    public async Task PendingMerge_rejectsOldFormatPayload()
+    {
+        await _factory.ResetDatabaseAsync();
+        var primary = NewUser("Primary", "primary@example.com");
+        var secondary = NewUser("Secondary", "secondary@example.com");
+        await SeedAsync(primary, secondary);
+
+        var clock = new FakeTimeProvider();
+        var merge = ResolveWithClock(_factory, clock, out var scope, out var db);
+        await using var _db = db;
+        using var _ = scope;
+
+        // Build a legacy 3-segment payload (no embedded expiry) signed with the
+        // same protector. A client retaining an old-format cookie must not be
+        // able to use it as if it were a valid pending merge.
+        var dp = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
+        var protector = dp.CreateProtector("Intervals.AccountMerge.PendingMerge");
+        var legacyPayload = $"{primary.Id}:{secondary.Id}:google";
+        var legacyCookie = protector.Protect(legacyPayload);
+
+        var context = NewHttpContext();
+        context.Request.Headers.Cookie = $"{AccountMergeService.CookieName}={legacyCookie}";
+
+        var detail = await merge.GetPendingMergeAsync(primary.Id, context);
+        Assert.Null(detail);
+
+        var ok = await merge.MergeAsync(primary.Id, context, correlationId: null);
+        Assert.False(ok);
+    }
+
+    private sealed class FakeTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _now = DateTimeOffset.UtcNow;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan t) => _now = _now.Add(t);
     }
 }

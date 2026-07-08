@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -17,6 +19,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Intervals.Api.Data;
 using Intervals.Api.Data.Entities;
 
@@ -291,35 +294,52 @@ public static class AuthExtensions
         builder.Services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.AddFixedWindowLimiter(RateLimitPolicy, window =>
-            {
-                window.PermitLimit = 60;
-                window.Window = TimeSpan.FromMinutes(1);
-                window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-                window.QueueLimit = 0;
-            });
-            options.AddFixedWindowLimiter("verification", window =>
-            {
-                window.PermitLimit = 5;
-                window.Window = TimeSpan.FromMinutes(1);
-                window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-                window.QueueLimit = 0;
-            });
-            options.AddFixedWindowLimiter("password-reset", window =>
-            {
-                window.PermitLimit = 5;
-                window.Window = TimeSpan.FromMinutes(1);
-                window.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-                window.QueueLimit = 0;
-            });
+            options.AddPolicy(RateLimitPolicy, context => GetRateLimitPartition(context, permitLimit: 60, window: TimeSpan.FromMinutes(1)));
+            options.AddPolicy("verification", context => GetRateLimitPartition(context, permitLimit: 5, window: TimeSpan.FromMinutes(1)));
+            options.AddPolicy("password-reset", context => GetRateLimitPartition(context, permitLimit: 5, window: TimeSpan.FromMinutes(1)));
         });
 
-        builder.Services.Configure<ForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownIPNetworks.Clear();
-            options.KnownProxies.Clear();
-        });
+        // Forwarded headers: trust-all is opt-in. In Development/Testing we keep the
+        // permissive behavior (dev proxies/Vite/Aspire sit in front of the app). In
+        // production the framework defaults (loopback only) apply unless an operator
+        // explicitly enables TrustAll or lists KnownProxies via configuration.
+        builder.Services.AddOptions<ForwardedHeadersOptions>()
+            .Configure<ILoggerFactory>((options, loggerFactory) =>
+            {
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                var forwardedOptions = authOptions.ForwardedHeaders ?? new ForwardedHeadersConfig();
+                var isDev = builder.Environment.IsDevelopment()
+                    || builder.Environment.IsEnvironment("Testing");
+
+                if (isDev || forwardedOptions.TrustAll)
+                {
+                    options.KnownIPNetworks.Clear();
+                    options.KnownProxies.Clear();
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(forwardedOptions.KnownProxies))
+                {
+                    return;
+                }
+
+                var logger = loggerFactory.CreateLogger(typeof(AuthExtensions));
+                foreach (var entry in forwardedOptions.KnownProxies.Split(
+                    ',',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    if (IPAddress.TryParse(entry, out var address))
+                    {
+                        options.KnownProxies.Add(address);
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "Skipping invalid Auth:ForwardedHeaders:KnownProxies entry '{Entry}'.",
+                            entry);
+                    }
+                }
+            });
 
         return builder;
     }
@@ -345,6 +365,26 @@ public static class AuthExtensions
     }
 
     private static bool IsApiRequest(HttpRequest request) => request.Path.StartsWithSegments("/api");
+
+    private static RateLimitPartition<string> GetRateLimitPartition(
+        HttpContext context, int permitLimit, TimeSpan window)
+    {
+        // Authenticated callers are bucketed per user id so one user cannot burn a
+        // shared global budget. Anonymous callers are bucketed per client IP (the
+        // resolved RemoteIpAddress), with a stable fallback for tests/local dev.
+        var userId = context.User.FindFirst(CurrentUser.UserIdClaimType)?.Value;
+        var partitionKey = !string.IsNullOrEmpty(userId)
+            ? userId
+            : context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = window,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+        });
+    }
 
     private static Task WriteApiError(HttpContext context, int statusCode, string code, string message)
     {
